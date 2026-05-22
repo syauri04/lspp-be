@@ -6,19 +6,19 @@
             <div class="navbar-brand-box">
                 <a href="{{ url('/') }}" class="logo logo-dark">
                     <span class="logo-sm">
-                        <img src="{{ Vite::asset('resources/images/logo.png') }}" alt="" height="22">
+                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="22">
                     </span>
                     <span class="logo-lg">
-                        <img src="{{ Vite::asset('resources/images/logo.png') }}" alt="" height="40">
+                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="40">
                     </span>
                 </a>
 
                 <a href="{{ url('/') }}" class="logo logo-light">
                     <span class="logo-sm">
-                        <img src="{{ Vite::asset('resources/images/logo.png') }}" alt="" height="22">
+                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="22">
                     </span>
                     <span class="logo-lg">
-                        <img src="{{ Vite::asset('resources/images/logo.png') }}" alt="" height="40">
+                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="40">
                     </span>
                 </a>
             </div>
