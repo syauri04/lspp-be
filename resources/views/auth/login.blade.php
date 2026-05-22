@@ -20,7 +20,7 @@
                                 <div class="px-2 py-3">
                                     <div class="text-center">
                                         <a href="{{ url('/') }}">
-                                            <img src="{{ Vite::asset('resources/images/logo.png') }}"
+                                            <img src="{{ Vite::asset('resources/assets/images/logo.png') }}"
                                                 height="80" alt="logo" />
                                         </a>
 
