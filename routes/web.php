@@ -12,7 +12,7 @@ use App\Http\Controllers\CMS\TUKController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect()->route('dashboard');
+    return redirect()->route('login');
 });
 
 Route::middleware(['auth'])->group(function () {
