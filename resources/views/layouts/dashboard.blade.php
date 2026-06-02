@@ -300,5 +300,5 @@
 
 
 @push('scripts')
-    @vite(['resources/js/pages/dashboard.js'])
+    @vite('resources/js/app.js')
 @endpush

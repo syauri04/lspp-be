@@ -251,9 +251,9 @@
 @endsection
 
 @push('scripts')
-    <script src="{{ Vite::asset('resources/assets/libs/parsleyjs/parsley.min.js') }}"></script>
+    <script src="{{ asset('resources/assets/libs/parsleyjs/parsley.min.js') }}"></script>
 
-    <script src="{{ Vite::asset('resources/assets/js/pages/form-validation.init.js') }}"></script>
+    <script src="{{ asset('resources/assets/js/pages/form-validation.init.js') }}"></script>
     <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
 
     <!-- Summernote js -->

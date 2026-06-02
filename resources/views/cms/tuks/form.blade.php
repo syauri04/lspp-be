@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @push('styles')
-    <link href="{{ Vite::asset('resources/assets/libs/select2/css/select2.min.css') }}" rel="stylesheet" type="text/css" />
+    <link href="{{ asset('resources/assets/libs/select2/css/select2.min.css') }}" rel="stylesheet" type="text/css" />
 @endpush
 
 
@@ -142,9 +142,9 @@
 @endsection
 
 @push('scripts')
-    <script src="{{ Vite::asset('resources/assets/libs/parsleyjs/parsley.min.js') }}"></script>
+    <script src="{{ asset('resources/assets/libs/parsleyjs/parsley.min.js') }}"></script>
 
-    <script src="{{ Vite::asset('resources/assets/js/pages/form-validation.init.js') }}"></script>
+    <script src="{{ asset('resources/assets/js/pages/form-validation.init.js') }}"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

@@ -4,8 +4,7 @@
         <div class="user-sidebar text-center">
             <div class="dropdown">
                 <div class="user-img">
-                    <img src="{{ Vite::asset('resources/assets/images/users/user.png') }}" alt=""
-                        class="rounded-circle" />
+                    <img src="{{ asset('statis/images/users/user.png') }}" alt="" class="rounded-circle" />
                     <span class="avatar-online bg-success"></span>
                 </div>
                 <div class="user-info">

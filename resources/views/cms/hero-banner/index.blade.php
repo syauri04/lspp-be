@@ -2,13 +2,12 @@
 
 @push('styles')
     <!-- DataTables -->
-    <link href="{{ Vite::asset('resources/assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.min.css') }}"
-        rel="stylesheet" />
-    <link href="{{ Vite::asset('resources/assets/libs/datatables.net-buttons-bs4/css/buttons.bootstrap4.min.css') }}"
+    <link href="{{ asset('resources/assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.min.css') }}" rel="stylesheet" />
+    <link href="{{ asset('resources/assets/libs/datatables.net-buttons-bs4/css/buttons.bootstrap4.min.css') }}"
         rel="stylesheet" />
 
     <!-- Responsive datatable -->
-    <link href="{{ Vite::asset('resources/assets/libs/datatables.net-responsive-bs4/css/responsive.bootstrap4.min.css') }}"
+    <link href="{{ asset('resources/assets/libs/datatables.net-responsive-bs4/css/responsive.bootstrap4.min.css') }}"
         rel="stylesheet" />
 @endpush
 
@@ -158,17 +157,16 @@
 
 @push('scripts')
     <!-- Required datatable js -->
-    <script src="{{ Vite::asset('resources/assets/libs/datatables.net/js/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ Vite::asset('resources/assets/libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ asset('resources/assets/libs/datatables.net/js/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ asset('resources/assets/libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
 
     <!-- Responsive examples -->
-    <script src="{{ Vite::asset('resources/assets/libs/datatables.net-responsive/js/dataTables.responsive.min.js') }}">
-    </script>
-    <script src="{{ Vite::asset('resources/assets/libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js') }}">
+    <script src="{{ asset('resources/assets/libs/datatables.net-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ asset('resources/assets/libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js') }}">
     </script>
 
     <!-- Datatable init js -->
-    <script src="{{ Vite::asset('resources/assets/js/pages/datatablescustom.init.js') }}"></script>
+    <script src="{{ asset('resources/assets/js/pages/datatablescustom.init.js') }}"></script>
 
     <script>
         function confirmDelete() {

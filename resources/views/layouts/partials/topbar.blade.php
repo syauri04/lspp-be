@@ -6,19 +6,19 @@
             <div class="navbar-brand-box">
                 <a href="{{ url('/') }}" class="logo logo-dark">
                     <span class="logo-sm">
-                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="22">
+                        <img src="{{ asset('statis/images/logo.png') }}" alt="" height="22">
                     </span>
                     <span class="logo-lg">
-                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="40">
+                        <img src="{{ asset('statis/images/logo.png') }}" alt="" height="40">
                     </span>
                 </a>
 
                 <a href="{{ url('/') }}" class="logo logo-light">
                     <span class="logo-sm">
-                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="22">
+                        <img src="{{ asset('statis/images/logo.png') }}" alt="" height="22">
                     </span>
                     <span class="logo-lg">
-                        <img src="{{ Vite::asset('resources/assets/images/logo.png') }}" alt="" height="40">
+                        <img src="{{ asset('statis/images/logo.png') }}" alt="" height="40">
                     </span>
                 </a>
             </div>
@@ -89,7 +89,7 @@
                         </a>
                         <a href="" class="text-reset notification-item">
                             <div class="media">
-                                <img src="{{ Vite::asset('resources/assets/images/def/user.png') }}"
+                                <img src="{{ asset('statis/images/def/user.png') }}"
                                     class="me-3 rounded-circle avatar-xs" alt="user-pic">
                                 <div class="media-body">
                                     <h6 class="mt-0 mb-1">James Lemire</h6>
@@ -119,7 +119,7 @@
 
                         <a href="" class="text-reset notification-item">
                             <div class="media">
-                                <img src="{{ Vite::asset('resources/assets/images/users/avatar-4.jpg') }}"
+                                <img src="{{ asset('statis/images/users/avatar-4.jpg') }}"
                                     class="me-3 rounded-circle avatar-xs" alt="user-pic">
                                 <div class="media-body">
                                     <h6 class="mt-0 mb-1">Salena Layfield</h6>
@@ -142,8 +142,8 @@
             <div class="dropdown d-inline-block">
                 <button type="button" class="btn header-item waves-effect" id="page-header-user-dropdown"
                     data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <img class="rounded-circle header-profile-user"
-                        src="{{ Vite::asset('resources/assets/images/users/user.png') }}" alt="Header Avatar">
+                    <img class="rounded-circle header-profile-user" src="{{ asset('statis/images/users/user.png') }}"
+                        alt="Header Avatar">
                     <span class="d-none d-xl-inline-block ms-1">Super Admin</span>
                     <i class="mdi mdi-chevron-down d-none d-xl-inline-block"></i>
                 </button>

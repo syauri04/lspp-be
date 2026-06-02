@@ -20,8 +20,8 @@
                                 <div class="px-2 py-3">
                                     <div class="text-center">
                                         <a href="{{ url('/') }}">
-                                            <img src="{{ Vite::asset('resources/assets/images/logo.png') }}"
-                                                height="80" alt="logo" />
+                                            <img src="{{ asset('statis/images/logo.png') }}" height="80"
+                                                alt="logo" />
                                         </a>
 
                                         <h5 class="text-custom mb-2 mt-4">Welcome Back !</h5>
