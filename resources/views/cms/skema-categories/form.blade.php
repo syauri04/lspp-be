@@ -5,15 +5,15 @@
 @endpush
 
 
-@section('title', 'Divisi')
+@section('title', 'Kategori Skema')
 
 @section('content')
     <div class="page-content">
 
         @include('layouts.partials.pagetitle', [
             'pagetitle' => 'Content Website',
-            'subtitle' => 'Berita',
-            'title' => 'Input Kategori',
+            'subtitle' => 'Skema Sertifikasi',
+            'title' => 'Input Kategori Skema',
             'action' => null,
         ])
         <!-- end page title -->
@@ -43,35 +43,24 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="name_id" class="form-label">Divisi ID</label>
-                                                <input type="text" name="name_id" class="form-control" id="name_id"
-                                                    placeholder="Divisi ID"
-                                                    value="{{ old('name_id', $data->name['id'] ?? '') }}" required>
+                                                <label for="kategori_id" class="form-label">Kategori ID</label>
+                                                <input type="text" name="kategori_id" class="form-control"
+                                                    id="kategori_id" placeholder="Kategori ID"
+                                                    value="{{ old('kategori_id', $data->kategori['id'] ?? '') }}" required>
 
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="name_en" class="form-label">Divisi EN</label>
-                                                <input type="text" name="name_en" class="form-control" id="name_en"
-                                                    placeholder="Divisi EN"
-                                                    value="{{ old('name_en', $data->name['en'] ?? '') }}" required>
+                                                <label for="kategori_en" class="form-label">Kategori EN</label>
+                                                <input type="text" name="kategori_en" class="form-control"
+                                                    id="kategori_en" placeholder="Kategori EN"
+                                                    value="{{ old('kategori_en', $data->kategori['en'] ?? '') }}" required>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="sort_order" class="form-label">Sort Order</label>
-                                                <input type="number" name="sort_order" class="form-control" id="sort_order"
-                                                    placeholder="Sort Order"
-                                                    value="{{ old('sort_order', $data->sort_order ?? 0) }}" />
-                                            </div>
-                                        </div>
-
-
-
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="validationCustom01" class="form-label">Status

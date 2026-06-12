@@ -5,15 +5,15 @@
 @endpush
 
 
-@section('title', 'Artikel')
+@section('title', 'Skema Sertifikasi')
 
 @section('content')
     <div class="page-content">
 
         @include('layouts.partials.pagetitle', [
             'pagetitle' => 'Content Website',
-            'subtitle' => 'Berita',
-            'title' => 'Input Artikel',
+            'subtitle' => 'Skema Sertifikasi',
+            'title' => 'Input Skema Sertifikasi',
             'action' => null,
         ])
         <!-- end page title -->
@@ -43,21 +43,21 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="news_category_id" class="form-label">Kategori</label>
-                                                <select class="form-select" id="news_category_id" name="news_category_id"
+                                                <label for="category_skema_id" class="form-label">Category</label>
+                                                <select class="form-select" id="category_skema_id" name="category_skema_id"
                                                     required>
-                                                    <option value="">-- Pilih Kategori --</option>
+                                                    <option value="">-- Pilih Category --</option>
                                                     @foreach ($categories as $category)
                                                         <option value="{{ $category->id }}"
-                                                            {{ old('news_category_id', $data->news_category_id ?? '') == $category->id ? 'selected' : '' }}>
-                                                            {{ $category->name['id'] }}
+                                                            {{ old('category_skema_id', $data->category_skema_id ?? '') == $category->id ? 'selected' : '' }}>
+                                                            {{ $category->kategori['id'] }}
                                                         </option>
                                                     @endforeach
                                                 </select>
 
 
                                                 <div class="invalid-feedback">
-                                                    Please select a valid kategori.
+                                                    Please select a valid category.
                                                 </div>
                                             </div>
                                         </div>
@@ -69,16 +69,15 @@
                                             <div class="mb-3">
                                                 <label for="title_id" class="form-label">Title ID</label>
                                                 <input type="text" name="title_id" class="form-control" id="title_id"
-                                                    placeholder="Title"
+                                                    placeholder="Title ID"
                                                     value="{{ old('title_id', $data->title['id'] ?? '') }}" required>
                                             </div>
                                         </div>
-
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="title_en" class="form-label">Title EN</label>
                                                 <input type="text" name="title_en" class="form-control" id="title_en"
-                                                    placeholder="Title"
+                                                    placeholder="Title EN"
                                                     value="{{ old('title_en', $data->title['en'] ?? '') }}" required>
                                             </div>
                                         </div>
@@ -88,27 +87,24 @@
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="summary_id" class="form-label">Summary ID</label>
-                                                <input type="text" name="summary_id" class="form-control" id="summary_id"
-                                                    placeholder="Summary"
-                                                    value="{{ old('summary_id', $data->summary['id'] ?? '') }}" required>
+                                                <textarea name="summary_id" class="form-control" id="summary_id" placeholder="Summary ID">{{ old('summary_id', $data->summary['id'] ?? '') }}</textarea>
                                             </div>
                                         </div>
-
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="summary_en" class="form-label">Summary EN</label>
-                                                <input type="text" name="summary_en" class="form-control" id="summary_en"
-                                                    placeholder="Summary"
-                                                    value="{{ old('summary_en', $data->summary['en'] ?? '') }}" required>
+                                                <textarea name="summary_en" class="form-control" id="summary_en" placeholder="Summary EN">{{ old('summary_en', $data->summary['en'] ?? '') }}</textarea>
                                             </div>
                                         </div>
+
                                     </div>
+
                                     <div class="row">
                                         <div class="col-md-12">
                                             <div class="mb-3">
-                                                <label>Content ID</label>
+                                                <label>Description ID</label>
                                                 <div>
-                                                    <textarea class="editor" name="content_id">{{ old('content_id', $data->content['id'] ?? '') }}</textarea>
+                                                    <textarea class="editor" name="description_id">{{ old('description_id', $data->description['id'] ?? '') }}</textarea>
 
                                                 </div>
                                             </div>
@@ -117,9 +113,9 @@
                                     <div class="row">
                                         <div class="col-md-12">
                                             <div class="mb-3">
-                                                <label>Content EN</label>
+                                                <label>Description EN</label>
                                                 <div>
-                                                    <textarea class="editor" name="content_en">{{ old('content_en', $data->content['en'] ?? '') }}</textarea>
+                                                    <textarea class="editor" name="description_en">{{ old('description_en', $data->description['en'] ?? '') }}</textarea>
 
                                                 </div>
                                             </div>
@@ -152,10 +148,10 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="source" class="form-label">Source</label>
-                                                <input type="text" name="source" class="form-control" id="source"
-                                                    placeholder="Source"
-                                                    value="{{ old('source', $data->source ?? '') }}" />
+                                                <label for="amount" class="form-label">Amount</label>
+                                                <input type="text" name="amount" class="form-control" id="amount"
+                                                    placeholder="ex: 1000000"
+                                                    value="{{ old('amount', $data->amount ?? '') }}" required>
                                             </div>
                                         </div>
 
@@ -291,8 +287,6 @@
             }
         });
     </script>
-
-
     <script>
         document.addEventListener('DOMContentLoaded', function() {
 

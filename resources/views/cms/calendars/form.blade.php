@@ -5,15 +5,15 @@
 @endpush
 
 
-@section('title', 'Divisi')
+@section('title', 'Kalender')
 
 @section('content')
     <div class="page-content">
 
         @include('layouts.partials.pagetitle', [
             'pagetitle' => 'Content Website',
-            'subtitle' => 'Berita',
-            'title' => 'Input Kategori',
+            'subtitle' => 'Kalender',
+            'title' => 'Input Kalender',
             'action' => null,
         ])
         <!-- end page title -->
@@ -43,35 +43,49 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="name_id" class="form-label">Divisi ID</label>
-                                                <input type="text" name="name_id" class="form-control" id="name_id"
-                                                    placeholder="Divisi ID"
-                                                    value="{{ old('name_id', $data->name['id'] ?? '') }}" required>
+                                                <label class="form-label">Date</label>
+                                                <input type="date" name="date" class="form-control"
+                                                    value="{{ old('date', isset($data->date) ? \Carbon\Carbon::parse($data->date)->format('Y-m-d') : '') }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="title_id" class="form-label">Title ID</label>
+                                                <input type="text" name="title_id" class="form-control" id="title_id"
+                                                    placeholder="Title ID"
+                                                    value="{{ old('title_id', $data->title['id'] ?? '') }}" required>
 
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="name_en" class="form-label">Divisi EN</label>
-                                                <input type="text" name="name_en" class="form-control" id="name_en"
-                                                    placeholder="Divisi EN"
-                                                    value="{{ old('name_en', $data->name['en'] ?? '') }}" required>
+                                                <label for="title_en" class="form-label">Title EN</label>
+                                                <input type="text" name="title_en" class="form-control" id="title_en"
+                                                    placeholder="Title EN"
+                                                    value="{{ old('title_en', $data->title['en'] ?? '') }}" required>
+
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="row">
+
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="sort_order" class="form-label">Sort Order</label>
-                                                <input type="number" name="sort_order" class="form-control" id="sort_order"
-                                                    placeholder="Sort Order"
-                                                    value="{{ old('sort_order', $data->sort_order ?? 0) }}" />
+                                                <label for="link" class="form-label">Link Redirect</label>
+                                                <input type="text" name="link" class="form-control" id="link"
+                                                    placeholder="ex: https://example.com"
+                                                    value="{{ old('link', $data->link ?? '') }}" required>
                                             </div>
                                         </div>
+                                    </div>
 
 
 
+                                    <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="validationCustom01" class="form-label">Status

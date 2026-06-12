@@ -50,11 +50,17 @@ class NewsArticleController extends Controller
 
         if ($request->hasFile('image')) {
 
-            $image = $request->file('image')
-                ->store(
-                    'uploads/news',
-                    'public'
-                );
+            $file = $request->file('image');
+
+            $filename = time() . '.' .
+                $file->getClientOriginalExtension();
+
+            $file->move(
+                public_path('uploads/news'),
+                $filename
+            );
+
+            $image = 'uploads/news/' . $filename;
         }
 
         $slug = Str::slug($request->title_id);
@@ -112,7 +118,7 @@ class NewsArticleController extends Controller
         Request $request,
         NewsArticle $newsArticle
     ) {
-        $image = $newsArticle->image;
+        $imagePath = $newsArticle->image;
 
         if ($request->hasFile('image')) {
 
@@ -123,11 +129,18 @@ class NewsArticleController extends Controller
                 unlink(public_path($newsArticle->image));
             }
 
-            $image = $request->file('image')
-                ->store(
-                    'uploads/news',
-                    'public'
-                );
+            $image = $request->file('image');
+
+            $filename = time() . '.' .
+                $image->getClientOriginalExtension();
+
+            $image->move(
+                public_path('uploads/news'),
+                $filename
+            );
+
+            $imagePath =
+                'uploads/news/' . $filename;
         }
 
         if ($newsArticle->title['id'] !== $request->title_id) {
@@ -164,7 +177,7 @@ class NewsArticleController extends Controller
                 'en' => $request->content_en,
             ],
 
-            'image' => $image,
+            'image' => $imagePath,
 
             'source' => $request->source,
 

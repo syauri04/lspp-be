@@ -43,6 +43,20 @@
 
                 <li>
                     <a href="javascript: void(0);"
+                        class="has-arrow waves-effect  {{ request()->segment(1) === 'sertifikat' ? 'mm-active' : '' }}">
+                        <i class="dripicons-card"></i>
+                        <span>Skema Sertifikasi</span>
+                    </a>
+                    <ul class="sub-menu {{ request()->segment(1) === 'sertifikat' ? 'mm-collapse mm-show' : '' }}">
+                        <li class="{{ request()->segment(2) === 'skema-categories' ? 'mm-active' : '' }}"><a
+                                href="{{ route('skema-categories.index') }}">Kategori Skema</a></li>
+                        <li class="{{ request()->segment(2) === 'skema-sertifikasi' ? 'mm-active' : '' }}"><a
+                                href="{{ route('skema-sertifikasi.index') }}">Skema Sertifikasi</a></li>
+                    </ul>
+                </li>
+
+                <li>
+                    <a href="javascript: void(0);"
                         class="has-arrow waves-effect  {{ request()->segment(1) === 'organizational' ? 'mm-active' : '' }}">
                         <i class="dripicons-network-3"></i>
                         <span>Struktur Organisasi</span>
@@ -65,7 +79,7 @@
                 <li>
                     <a href="javascript: void(0);"
                         class="has-arrow waves-effect  {{ request()->segment(1) === 'news' ? 'mm-active' : '' }}">
-                        <i class="dripicons-network-3"></i>
+                        <i class=" dripicons-article"></i>
                         <span>Berita</span>
                     </a>
                     <ul class="sub-menu {{ request()->segment(1) === 'news' ? 'mm-collapse mm-show' : '' }}">
@@ -81,7 +95,21 @@
                 <li>
                     <a href="{{ route('gallery-albums.index') }}" class="waves-effect">
                         <i class="dripicons-photo-group"></i>
-                        <span>Galeri Album</span>
+                        <span>Galeri Albums</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ route('calendars.index') }}" class="waves-effect">
+                        <i class="dripicons-calendar"></i>
+                        <span>Kalender</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ route('faqs.index') }}" class="waves-effect">
+                        <i class="dripicons-checklist"></i>
+                        <span>FAQ</span>
                     </a>
                 </li>
 

@@ -5,15 +5,15 @@
 @endpush
 
 
-@section('title', 'Artikel')
+@section('title', 'Faqs')
 
 @section('content')
     <div class="page-content">
 
         @include('layouts.partials.pagetitle', [
             'pagetitle' => 'Content Website',
-            'subtitle' => 'Berita',
-            'title' => 'Input Artikel',
+            'subtitle' => 'FAQs',
+            'title' => 'Input FAQ',
             'action' => null,
         ])
         <!-- end page title -->
@@ -40,69 +40,29 @@
                                     @if ($method !== 'POST')
                                         @method($method)
                                     @endif
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="news_category_id" class="form-label">Kategori</label>
-                                                <select class="form-select" id="news_category_id" name="news_category_id"
-                                                    required>
-                                                    <option value="">-- Pilih Kategori --</option>
-                                                    @foreach ($categories as $category)
-                                                        <option value="{{ $category->id }}"
-                                                            {{ old('news_category_id', $data->news_category_id ?? '') == $category->id ? 'selected' : '' }}>
-                                                            {{ $category->name['id'] }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-
-
-                                                <div class="invalid-feedback">
-                                                    Please select a valid kategori.
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                    </div>
 
                                     <div class="row">
+
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="title_id" class="form-label">Title ID</label>
                                                 <input type="text" name="title_id" class="form-control" id="title_id"
-                                                    placeholder="Title"
+                                                    placeholder="Title ID"
                                                     value="{{ old('title_id', $data->title['id'] ?? '') }}" required>
+
                                             </div>
                                         </div>
-
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="title_en" class="form-label">Title EN</label>
                                                 <input type="text" name="title_en" class="form-control" id="title_en"
-                                                    placeholder="Title"
+                                                    placeholder="Title EN"
                                                     value="{{ old('title_en', $data->title['en'] ?? '') }}" required>
+
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="summary_id" class="form-label">Summary ID</label>
-                                                <input type="text" name="summary_id" class="form-control" id="summary_id"
-                                                    placeholder="Summary"
-                                                    value="{{ old('summary_id', $data->summary['id'] ?? '') }}" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="summary_en" class="form-label">Summary EN</label>
-                                                <input type="text" name="summary_en" class="form-control" id="summary_en"
-                                                    placeholder="Summary"
-                                                    value="{{ old('summary_en', $data->summary['en'] ?? '') }}" required>
-                                            </div>
-                                        </div>
-                                    </div>
                                     <div class="row">
                                         <div class="col-md-12">
                                             <div class="mb-3">
@@ -125,42 +85,10 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Upload Image</label>
 
-                                                <input type="file" class="form-control file-input" name="image"
-                                                    accept="image/*" data-preview="image">
 
-                                                <div id="preview-image" class="mt-2 d-none">
-                                                    <img src="" alt="Preview Image" class="img-fluid rounded"
-                                                        style="max-height:200px;">
-                                                </div>
-
-                                                @if (!empty($data->image))
-                                                    <div class="mt-2">
-                                                        <!-- Preview image lama -->
-                                                        <img src="{{ asset($data->image) }}" alt="Preview Image Lama"
-                                                            class="img-fluid rounded" style="max-height:200px;">
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    </div>
 
                                     <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="source" class="form-label">Source</label>
-                                                <input type="text" name="source" class="form-control" id="source"
-                                                    placeholder="Source"
-                                                    value="{{ old('source', $data->source ?? '') }}" />
-                                            </div>
-                                        </div>
-
-
-
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="validationCustom01" class="form-label">Status
@@ -174,6 +102,9 @@
                                                         {{ old('is_active', $data->is_active ?? '') == '0' ? 'selected' : '' }}>
                                                         Inactive
                                                     </option>
+
+
+
                                                 </select>
 
 
@@ -291,7 +222,6 @@
             }
         });
     </script>
-
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

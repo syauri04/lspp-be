@@ -11,19 +11,19 @@
         rel="stylesheet" />
 @endpush
 
-@section('title', 'News Articles')
+@section('title', 'Kalender')
 
 @section('content')
     <div class="page-content">
 
         @include('layouts.partials.pagetitle', [
             'pagetitle' => 'Content Website',
-            'subtitle' => 'Berita',
-            'title' => 'Artikel',
-            'action' => request()->is('news/news-articles')
+            'subtitle' => 'Kalender',
+            'title' => 'List',
+            'action' => request()->is('calendars')
                 ? [
-                    'label' => 'Tambah Artikel',
-                    'url' => route('news-articles.create'),
+                    'label' => 'Tambah Kalender',
+                    'url' => route('calendars.create'),
                     'icon' => 'mdi mdi-plus-circle',
                     'type' => 'success',
                 ]
@@ -63,10 +63,10 @@
                                     <thead>
                                         <tr>
                                             <th class="dt-no text-center">No</th>
-                                            <th>Image</th>
-                                            <th>Kategori</th>
+                                            <th>Date</th>
                                             <th>Title ID</th>
                                             <th>Title EN</th>
+                                            <th>Link</th>
                                             <th>Status</th>
                                             <th class="dt-action">Aksi</th>
                                         </tr>
@@ -74,20 +74,14 @@
 
                                     <tbody>
 
-                                        @forelse ($articles as $index => $p)
+                                        @forelse ($tuks as $index => $p)
                                             <tr>
                                                 <td></td>
 
-                                                <td width="120">
-
-                                                    @if ($p->image)
-                                                        <img src="{{ asset($p->image) }}" width="100">
-                                                    @endif
-
-                                                </td>
                                                 <td>
-                                                    {{ $p->category->name['id'] ?? '-' }}
+                                                    {{ Carbon\Carbon::parse($p->date)->format('Y-m-d') ?? '-' }}
                                                 </td>
+
                                                 <td>
                                                     {{ $p->title['id'] ?? '-' }}
                                                 </td>
@@ -95,7 +89,9 @@
                                                 <td>
                                                     {{ $p->title['en'] ?? '-' }}
                                                 </td>
-
+                                                <td>
+                                                    {{ $p->link ?? '-' }}
+                                                </td>
 
                                                 <td>
                                                     @php
@@ -118,13 +114,13 @@
                                                 <td class="text-center">
                                                     <div class="d-inline-flex gap-1">
                                                         {{-- EDIT --}}
-                                                        <a href="{{ route('news-articles.edit', $p->id) }}"
+                                                        <a href="{{ route('calendars.edit', $p->id) }}"
                                                             class="btn btn-outline-secondary btn-sm" title="Edit">
                                                             <i class="fas fa-pencil-alt"></i>
                                                         </a>
 
                                                         {{-- DELETE --}}
-                                                        <form action="{{ route('news-articles.destroy', $p->id) }}"
+                                                        <form action="{{ route('calendars.destroy', $p->id) }}"
                                                             method="POST" class="d-inline"
                                                             onsubmit="return confirmDelete()">
                                                             @csrf
@@ -140,7 +136,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="6" class="text-center">Tidak ada anggota</td>
+                                                <td colspan="6" class="text-center">Tidak ada Lokasi TUK</td>
                                             </tr>
                                         @endforelse
                                     </tbody>
