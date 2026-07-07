@@ -113,6 +113,14 @@
                     </a>
                 </li>
 
+                <li class="menu-title">Users</li>
+                <li>
+                    <a href="{{ route('asesis.index') }}" class="waves-effect">
+                        <i class="dripicons-checklist"></i>
+                        <span>Daftar Asesi</span>
+                    </a>
+                </li>
+
 
             </ul>
         </div>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CMS\AboutPageController;
+use App\Http\Controllers\CMS\AsesiController;
 use App\Http\Controllers\CMS\CalendarController;
 use App\Http\Controllers\CMS\CategorySkemaSertifikasiController;
 use App\Http\Controllers\CMS\DivisionController;
@@ -95,8 +96,11 @@ Route::middleware(['auth'])->group(function () {
 
     // Calendar
     Route::resource('calendars', CalendarController::class);
-    // Calendar
+    // Faqs
     Route::resource('faqs', FaqController::class);
+
+    // Asesi
+    Route::resource('asesis', AsesiController::class);
 });
 
 require __DIR__ . '/auth.php';

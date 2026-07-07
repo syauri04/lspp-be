@@ -10,6 +10,44 @@ use App\Http\Controllers\API\SertifikasiController;
 use App\Http\Controllers\API\StrukturController;
 use App\Http\Controllers\API\TukController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\Auth\{
+    RegisterController,
+    LoginController,
+    LogoutController,
+    MeController,
+    VerifyEmailController,
+    ResendVerificationController,
+};
+
+/*
+|--------------------------------------------------------------------------
+| AUTH (FE) — HARUS DI LUAR group auth:sanctum CMS
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('auth')->group(function () {
+    Route::post('register', RegisterController::class)->middleware('throttle:5,1');
+    Route::post('login', LoginController::class)->middleware('throttle:5,1');
+
+    Route::post('email/verify', VerifyEmailController::class)
+        ->middleware('signed')
+        ->name('api.asesi.verify-email');
+
+    Route::post('email/resend', ResendVerificationController::class)
+        ->middleware('throttle:3,1');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('logout', LogoutController::class);
+        Route::get('me', MeController::class);
+    });
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| CMS
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware('auth:sanctum', 'throttle:60,1')
     ->group(function () {

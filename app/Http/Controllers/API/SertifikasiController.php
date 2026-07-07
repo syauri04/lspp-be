@@ -9,6 +9,7 @@ use App\Http\Resources\SkemaSertifikasiDetailResource;
 use App\Models\CategorySkemaSertifikasi;
 use App\Models\SkemaSertifikasi;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class SertifikasiController extends Controller
 {
@@ -22,12 +23,34 @@ class SertifikasiController extends Controller
         return CategorySkemaResource::collection($categories);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $data = SkemaSertifikasi::query()
             ->where('is_active', true)
-            ->latest()
-            ->paginate(9);
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $query->whereRaw('LOWER(title) LIKE ?', ['%' . strtolower($request->search) . '%']);
+            })
+            ->when($request->filled('category'), function ($query) use ($request) {
+                $query->where('category_skema_id', $request->category);
+            })
+            ->when($request->filled('sort'), function ($query) use ($request) {
+                switch ($request->sort) {
+                    case 'terlama':
+                        $query->orderBy('created_at', 'asc');
+                        break;
+                    case 'terbanyak':
+                        $query->orderByDesc('is_view');
+                        break;
+                    case 'terbaru':
+                    default:
+                        $query->orderByDesc('created_at');
+                        break;
+                }
+            }, function ($query) {
+                // default sort kalau tidak ada param sort
+                $query->orderByDesc('created_at');
+            })
+            ->paginate($request->input('limit', 9));
 
         return SkemaSertifikasiCardResource::collection($data);
     }
@@ -39,9 +62,14 @@ class SertifikasiController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        $data->increment('is_view');
+        $cacheKey = 'sertifikasi_view_' . $data->id . '_' . request()->ip();
 
-        $data->refresh();
+        if (!Cache::has($cacheKey)) {
+            $data->increment('is_view');
+            $data->refresh();
+
+            Cache::put($cacheKey, true, now()->addHour());
+        }
 
         return new SkemaSertifikasiDetailResource($data);
     }
