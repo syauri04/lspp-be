@@ -33,8 +33,15 @@ class Asesi extends Authenticatable implements MustVerifyEmail
         ];
     }
 
+    protected $appends = ['has_password'];
+
     public function sendEmailVerificationNotification(): void
     {
         $this->notify(new \App\Notifications\AsesiVerifyEmail());
+    }
+
+    public function getHasPasswordAttribute(): bool
+    {
+        return ! is_null($this->password);
     }
 }

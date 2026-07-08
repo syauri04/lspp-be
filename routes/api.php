@@ -11,12 +11,16 @@ use App\Http\Controllers\API\StrukturController;
 use App\Http\Controllers\API\TukController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\Auth\{
+    ChangePasswordController,
+    GoogleLoginController,
     RegisterController,
     LoginController,
     LogoutController,
     MeController,
     VerifyEmailController,
     ResendVerificationController,
+    SetPasswordController,
+    UpdateProfileController,
 };
 
 /*
@@ -39,7 +43,13 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', LogoutController::class);
         Route::get('me', MeController::class);
+
+        Route::post('profile', UpdateProfileController::class);
+        Route::post('set-password', SetPasswordController::class)->middleware('throttle:5,1');
+        Route::post('change-password', ChangePasswordController::class)->middleware('throttle:5,1');
     });
+
+    Route::post('google', GoogleLoginController::class)->middleware('throttle:5,1');
 });
 
 
