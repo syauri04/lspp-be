@@ -22,6 +22,7 @@ use App\Http\Controllers\API\Auth\{
     SetPasswordController,
     UpdateProfileController,
 };
+use App\Http\Controllers\API\MitraController;
 
 /*
 |--------------------------------------------------------------------------
@@ -174,12 +175,18 @@ Route::middleware([
 
         /*
         |--------------------------------------------------------------------------
-        | Calendars
+        | FAQ
         |--------------------------------------------------------------------------
         */
 
         Route::get('/faqs', [
             FaqController::class,
+            'index'
+        ]);
+
+        // Mitra
+        Route::get('/mitras', [
+            MitraController::class,
             'index'
         ]);
     });

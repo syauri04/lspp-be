@@ -5,6 +5,8 @@ namespace App\Http\Controllers\CMS;
 use App\Http\Controllers\Controller;
 use App\Models\Asesi;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class AsesiController extends Controller
 {
@@ -65,6 +67,24 @@ class AsesiController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $asesi = Asesi::findOrFail($id);
+
+        try {
+            if ($asesi->avatar && Storage::disk('public')->exists($asesi->avatar)) {
+                Storage::disk('public')->delete($asesi->avatar);
+            }
+
+            $asesi->delete();
+
+            return redirect()
+                ->route('asesis.index')
+                ->with('success', 'Data asesi berhasil dihapus');
+        } catch (\Exception $e) {
+            Log::error('Gagal menghapus asesi: ' . $e->getMessage());
+
+            return redirect()
+                ->route('asesis.index')
+                ->with('error', 'Gagal menghapus data asesi, silakan coba lagi');
+        }
     }
 }

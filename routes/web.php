@@ -9,6 +9,7 @@ use App\Http\Controllers\CMS\FaqController;
 use App\Http\Controllers\CMS\GalleryAlbumController;
 use App\Http\Controllers\CMS\HeroBannerController;
 use App\Http\Controllers\CMS\MemberController;
+use App\Http\Controllers\CMS\MitraController;
 use App\Http\Controllers\CMS\NewsArticleController;
 use App\Http\Controllers\CMS\NewsCategoryController;
 use App\Http\Controllers\CMS\SkemaSertifikasiController;
@@ -98,6 +99,12 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('calendars', CalendarController::class);
     // Faqs
     Route::resource('faqs', FaqController::class);
+
+    // Mitra
+    Route::resource(
+        'mitras',
+        MitraController::class
+    );
 
     // Asesi
     Route::resource('asesis', AsesiController::class);
