@@ -40,7 +40,7 @@ class MitraController extends Controller
 
             'link' => 'nullable',
 
-            'logo' => 'required|image',
+            'logo' => 'nullable|image',
             'is_active' => 'required|boolean',
         ]);
 
@@ -103,7 +103,7 @@ class MitraController extends Controller
 
             'link' => 'nullable',
 
-            'logo' => 'required|image',
+            'logo' => 'nullable|image',
             'is_active' => 'required|boolean',
         ]);
 
