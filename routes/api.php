@@ -3,7 +3,7 @@
 use App\Http\Controllers\API\AboutPageController;
 use App\Http\Controllers\API\CalendarsController;
 use App\Http\Controllers\API\FaqController;
-use App\Http\Controllers\Api\GalleryController;
+use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\HeroBannerController;
 use App\Http\Controllers\API\NewsArticleController;
 use App\Http\Controllers\API\SertifikasiController;
@@ -22,7 +22,11 @@ use App\Http\Controllers\API\Auth\{
     SetPasswordController,
     UpdateProfileController,
 };
+
 use App\Http\Controllers\API\MitraController;
+use App\Http\Controllers\API\Pendaftaran\CheckoutController;
+use App\Http\Controllers\Api\Pendaftaran\MidtransWebhookController;
+use App\Http\Controllers\API\Pendaftaran\PendaftaranSertifikasiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -190,3 +194,69 @@ Route::middleware([
             'index'
         ]);
     });
+
+/*
+|--------------------------------------------------------------------------
+| Pendaftaran Sertifikasi (asesi login wajib)
+|--------------------------------------------------------------------------
+| Endpoint 'store' throttle lebih ketat karena melibatkan upload 5 file
+| sekaligus (KTP, ijazah, portfolio, pas foto, CV) — cegah abuse/spam submit.
+*/
+
+Route::middleware(['auth:sanctum', 'throttle:60,1'])
+    ->prefix('pendaftaran-sertifikasi')
+    ->group(function () {
+
+        Route::get('/', [PendaftaranSertifikasiController::class, 'index']);
+
+        Route::get('/{pendaftaran:kode_pendaftaran}', [
+            PendaftaranSertifikasiController::class,
+            'show'
+        ]);
+
+        Route::post('/', [PendaftaranSertifikasiController::class, 'store'])
+            ->middleware('throttle:5,1');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Checkout (dipanggil Next.js FE, asesi login wajib)
+|--------------------------------------------------------------------------
+| 'show' cuma ambil info harga -- aman dipanggil kapan saja, tidak menyentuh Midtrans.
+| 'snap-token' baru manggil Midtrans, hanya dipanggil saat asesi klik "Bayar Sekarang".
+*/
+
+Route::middleware(['auth:sanctum', 'throttle:60,1'])
+    ->prefix('checkout')
+    ->group(function () {
+
+        Route::get('/{pendaftaran:kode_pendaftaran}', [
+            CheckoutController::class,
+            'show'
+        ]);
+
+        Route::post('/{pendaftaran:kode_pendaftaran}/snap-token', [
+            CheckoutController::class,
+            'snapToken'
+        ])->middleware('throttle:20,1');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Midtrans Webhook
+|--------------------------------------------------------------------------
+| SENGAJA di luar semua middleware auth:sanctum di atas -- ini dipanggil
+| langsung oleh server Midtrans, bukan oleh asesi/admin, jadi tidak punya
+| Bearer token sama sekali. Keamanan bergantung sepenuhnya pada verifikasi
+| signature_key di dalam MidtransWebhookController::signatureValid().
+|
+| Daftarkan URL ini di dashboard Midtrans:
+| Settings > Configuration > Payment Notification URL
+| -> https://domainmu.com/api/midtrans/callback
+|
+| withoutMiddleware('throttle:api') untuk lepas dari rate limit default 60/menit
+| per-IP bawaan Laravel -- IP server Midtrans dipakai bersama oleh banyak merchant
+| lain, jadi throttle per-IP standar berisiko salah membatasi.
+*/
+
+Route::post('/midtrans/callback', [MidtransWebhookController::class, 'handle']);

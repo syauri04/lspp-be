@@ -12,9 +12,11 @@ use App\Http\Controllers\CMS\MemberController;
 use App\Http\Controllers\CMS\MitraController;
 use App\Http\Controllers\CMS\NewsArticleController;
 use App\Http\Controllers\CMS\NewsCategoryController;
+use App\Http\Controllers\CMS\PendaftaranSertifikasiController;
 use App\Http\Controllers\CMS\SkemaSertifikasiController;
 use App\Http\Controllers\CMS\TinyMceController;
 use App\Http\Controllers\CMS\TUKController;
+use App\Http\Controllers\DokumenPendaftaranController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -22,6 +24,28 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+
+    // Pendaftaran Sertifikasi
+    Route::prefix('pendaftaran')
+        ->name('pendaftaran.')
+        ->group(function () {
+            Route::get('/', [PendaftaranSertifikasiController::class, 'index'])
+                ->name('index');
+
+            Route::get('/{pendaftaran:kode_pendaftaran}', [PendaftaranSertifikasiController::class, 'show'])
+                ->name('show');
+
+            Route::post('/{pendaftaran:kode_pendaftaran}/approve', [PendaftaranSertifikasiController::class, 'approve'])
+                ->name('approve');
+
+            Route::post('/{pendaftaran:kode_pendaftaran}/reject', [PendaftaranSertifikasiController::class, 'reject'])
+                ->name('reject');
+        });
+
+    // view Dokumen
+    Route::get('/dokumen/{dokumen}/preview', [DokumenPendaftaranController::class, 'preview'])
+        ->middleware('signed')
+        ->name('dokumen.preview');
 
 
     Route::post('/tinymce/upload', [TinyMceController::class, 'upload'])

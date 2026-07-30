@@ -26,6 +26,13 @@
                         <span>Dashboard</span>
                     </a>
                 </li>
+                <li class="menu-title">Management Sertifikasi</li>
+                <li>
+                    <a href="{{ route('pendaftaran.index') }}" class="waves-effect">
+                        <i class="dripicons-checklist"></i>
+                        <span>Pendaftaran Sertifikasi</span>
+                    </a>
+                </li>
 
                 <li class="menu-title">Content Website</li>
                 <li>
