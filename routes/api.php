@@ -25,7 +25,7 @@ use App\Http\Controllers\API\Auth\{
 
 use App\Http\Controllers\API\MitraController;
 use App\Http\Controllers\API\Pendaftaran\CheckoutController;
-use App\Http\Controllers\Api\Pendaftaran\MidtransWebhookController;
+use App\Http\Controllers\API\Pendaftaran\DokuWebhookController;
 use App\Http\Controllers\API\Pendaftaran\PendaftaranSertifikasiController;
 
 /*
@@ -235,28 +235,32 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])
             'show'
         ]);
 
-        Route::post('/{pendaftaran:kode_pendaftaran}/snap-token', [
+        Route::post('/{pendaftaran:kode_pendaftaran}/pay', [
             CheckoutController::class,
-            'snapToken'
+            'pay'
         ])->middleware('throttle:20,1');
+
+        // Route::post('/{pendaftaran:kode_pendaftaran}/snap-token', [
+        //     CheckoutController::class,
+        //     'snapToken'
+        // ])->middleware('throttle:20,1');
     });
 
 /*
 |--------------------------------------------------------------------------
-| Midtrans Webhook
+| DOKU Webhook
 |--------------------------------------------------------------------------
 | SENGAJA di luar semua middleware auth:sanctum di atas -- ini dipanggil
-| langsung oleh server Midtrans, bukan oleh asesi/admin, jadi tidak punya
+| langsung oleh server DOKU, bukan oleh asesi/admin, jadi tidak punya
 | Bearer token sama sekali. Keamanan bergantung sepenuhnya pada verifikasi
-| signature_key di dalam MidtransWebhookController::signatureValid().
+| signature di dalam DokuWebhookController::signatureValid().
 |
-| Daftarkan URL ini di dashboard Midtrans:
-| Settings > Configuration > Payment Notification URL
-| -> https://domainmu.com/api/midtrans/callback
+| Daftarkan URL ini di DOKU Dashboard sesuai dokumentasi resmi mereka
+| (nama menu/pengaturan notifikasi URL bisa beda tergantung produk DOKU
+| yang dipakai) -> https://domainmu.com/api/doku/callback
 |
-| withoutMiddleware('throttle:api') untuk lepas dari rate limit default 60/menit
-| per-IP bawaan Laravel -- IP server Midtrans dipakai bersama oleh banyak merchant
-| lain, jadi throttle per-IP standar berisiko salah membatasi.
+| Tidak ada rate limiter 'api' terdaftar di project ini, jadi route ini
+| otomatis TIDAK kena throttle apapun.
 */
 
-Route::post('/midtrans/callback', [MidtransWebhookController::class, 'handle']);
+Route::post('/doku/callback', [DokuWebhookController::class, 'handle']);
