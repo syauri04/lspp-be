@@ -32,7 +32,7 @@ class CheckoutController extends Controller
         $pembayaran = $pendaftaran->pembayaran;
 
         abort_if(
-            !$pembayaran || $pembayaran->status !== 'pending',
+            ! $pembayaran || $pembayaran->status !== 'pending',
             404,
             'Tagihan pembayaran tidak ditemukan atau sudah tidak berlaku.'
         );
@@ -74,7 +74,7 @@ class CheckoutController extends Controller
         abort_unless($pendaftaran->status === 'awaiting_payment', 404);
 
         $pembayaran = $pendaftaran->pembayaran;
-        abort_if(!$pembayaran || $pembayaran->status !== 'pending', 404);
+        abort_if(! $pembayaran || $pembayaran->status !== 'pending', 404);
 
         if ($pembayaran->expired_at && now()->greaterThanOrEqualTo($pembayaran->expired_at)) {
             $pembayaran->update(['status' => 'expired']);
@@ -104,7 +104,7 @@ class CheckoutController extends Controller
             'order' => [
                 'amount' => (int) $pembayaran->jumlah,
                 'invoice_number' => $pembayaran->kode_transaksi,
-                'callback_url' => rtrim(config('app.frontend_url'), '/') . '/checkout/' . $pendaftaran->kode_pendaftaran . '/selesai',
+                'callback_url' => rtrim(config('app.frontend_url'), '/').'/checkout/'.$pendaftaran->kode_pendaftaran.'/selesai',
                 'auto_redirect' => true,
             ],
             'payment' => [
@@ -113,7 +113,7 @@ class CheckoutController extends Controller
                     : 1440,
             ],
             'customer' => [
-                'name' => $asesi->nama,
+                'name' => $asesi->name,
                 'email' => $asesi->email,
             ],
         ];
@@ -124,14 +124,14 @@ class CheckoutController extends Controller
         // Urutan komponen & format ini WAJIB persis seperti ini -- dikonfirmasi dari
         // dokumentasi resmi "Signature Component from Request Header" DOKU.
         $signatureComponents = implode("\n", [
-            'Client-Id:' . config('services.doku.client_id'),
-            'Request-Id:' . $requestId,
-            'Request-Timestamp:' . $timestamp,
-            'Request-Target:' . $path,
-            'Digest:' . $digest,
+            'Client-Id:'.config('services.doku.client_id'),
+            'Request-Id:'.$requestId,
+            'Request-Timestamp:'.$timestamp,
+            'Request-Target:'.$path,
+            'Digest:'.$digest,
         ]);
 
-        $signature = 'HMACSHA256=' . base64_encode(
+        $signature = 'HMACSHA256='.base64_encode(
             hash_hmac('sha256', $signatureComponents, config('services.doku.secret_key'), true)
         );
 
@@ -143,7 +143,7 @@ class CheckoutController extends Controller
                 'Signature' => $signature,
                 'Content-Type' => 'application/json',
             ])->withBody($bodyJson, 'application/json')
-                ->post($baseUrl . $path)
+                ->post($baseUrl.$path)
                 ->throw();
         } catch (RequestException $e) {
             Log::error('DOKU checkout gagal dibuat', [

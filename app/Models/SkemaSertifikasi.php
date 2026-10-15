@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SkemaSertifikasi extends Model
 {
@@ -13,8 +14,11 @@ class SkemaSertifikasi extends Model
         'category_skema_id',
         'title',
         'slug',
+        'jenis_skema',
+        'nomor_skema',
         'summary',
         'description',
+        'standar_kompetensi_kerja',
         'image',
         'amount',
         'is_view',
@@ -35,5 +39,18 @@ class SkemaSertifikasi extends Model
             CategorySkemaSertifikasi::class,
             'category_skema_id'
         );
+    }
+
+    public function unitKompetensis(): HasMany
+    {
+        return $this->hasMany(
+            UnitKompetensi::class,
+            'skema_sertifikasi_id'
+        )->orderBy('urutan');
+    }
+
+    public function buktiPersyaratanDasar()
+    {
+        return $this->hasMany(BuktiPersyaratanDasar::class)->orderBy('urutan');
     }
 }

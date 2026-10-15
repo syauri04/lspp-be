@@ -86,6 +86,35 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
+                                                <label for="jenis_skema" class="form-label">Jenis Skema</label>
+                                                <select class="form-select" id="jenis_skema" name="jenis_skema" required>
+                                                    <option value="">-- Pilih Jenis Skema --</option>
+                                                    @foreach (['KKNI', 'Okupasi', 'Klaster'] as $jenis)
+                                                        <option value="{{ $jenis }}"
+                                                            {{ old('jenis_skema', $data->jenis_skema ?? '') == $jenis ? 'selected' : '' }}>
+                                                            {{ $jenis }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+
+                                                <div class="invalid-feedback">
+                                                    Please select a valid jenis skema.
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="nomor_skema" class="form-label">Nomor Skema</label>
+                                                <input type="text" name="nomor_skema" class="form-control"
+                                                    id="nomor_skema" placeholder="ex: SKM.01/LSP/2025"
+                                                    value="{{ old('nomor_skema', $data->nomor_skema ?? '') }}">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
                                                 <label for="summary_id" class="form-label">Summary ID</label>
                                                 <textarea name="summary_id" class="form-control" id="summary_id" placeholder="Summary ID">{{ old('summary_id', $data->summary['id'] ?? '') }}</textarea>
                                             </div>
@@ -121,6 +150,222 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <div class="mb-3">
+                                                <label>Standar Kompetensi Kerja</label>
+                                                <div>
+                                                    <textarea class="editor" name="standar_kompetensi_kerja">{{ old('standar_kompetensi_kerja', $data->standar_kompetensi_kerja ?? '') }}</textarea>
+
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <div class="mb-3">
+                                                <label class="form-label mb-0">Unit Kompetensi</label>
+                                                <p class="text-muted small mb-2">Daftar unit kompetensi yang
+                                                    dipersyaratkan pada skema ini.</p>
+
+                                                <div class="table-responsive">
+                                                    @php
+                                                        $oldUnit = old('unit_kompetensi');
+
+                                                        if ($oldUnit) {
+                                                            // old() balikin shape mentah dari input form:
+                                                            // ['id' => [...], 'kode_unit' => [...], 'judul_unit' => [...]]
+                                                            // -> perlu di-"zip" jadi array per-baris biar bisa di-foreach.
+                                                            $unitRows = [];
+                                                            foreach ($oldUnit['kode_unit'] ?? [] as $i => $kodeUnit) {
+                                                                $unitRows[] = [
+                                                                    'id' => $oldUnit['id'][$i] ?? null,
+                                                                    'kode_unit' => $kodeUnit,
+                                                                    'judul_unit' => $oldUnit['judul_unit'][$i] ?? '',
+                                                                ];
+                                                            }
+                                                        } elseif (isset($data)) {
+                                                            $unitRows = $data->unitKompetensis
+                                                                ->map(
+                                                                    fn($u) => [
+                                                                        'id' => $u->id,
+                                                                        'kode_unit' => $u->kode_unit,
+                                                                        'judul_unit' => $u->judul_unit,
+                                                                    ],
+                                                                )
+                                                                ->all();
+                                                        } else {
+                                                            $unitRows = [
+                                                                [
+                                                                    'id' => null,
+                                                                    'kode_unit' => '',
+                                                                    'judul_unit' => '',
+                                                                ],
+                                                            ];
+                                                        }
+                                                    @endphp
+                                                    <table class="table table-bordered align-middle mb-2"
+                                                        id="unit-kompetensi-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style="width: 60px;">No</th>
+                                                                <th style="width: 30%;">Kode Unit</th>
+                                                                <th>Judul Unit</th>
+                                                                <th style="width: 160px;"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="unit-kompetensi-rows">
+                                                            @foreach ($unitRows as $index => $unit)
+                                                                <tr class="unit-kompetensi-row">
+                                                                    <td class="text-center unit-row-no">
+                                                                        {{ $index + 1 }}</td>
+                                                                    <td>
+                                                                        <input type="hidden" name="unit_kompetensi[id][]"
+                                                                            value="{{ $unit['id'] ?? '' }}">
+                                                                        <input type="text"
+                                                                            name="unit_kompetensi[kode_unit][]"
+                                                                            class="form-control"
+                                                                            value="{{ $unit['kode_unit'] ?? '' }}">
+                                                                    </td>
+                                                                    <td>
+                                                                        <input type="text"
+                                                                            name="unit_kompetensi[judul_unit][]"
+                                                                            class="form-control"
+                                                                            value="{{ $unit['judul_unit'] ?? '' }}">
+                                                                    </td>
+                                                                    <td class="text-center">
+                                                                        @if (!empty($unit['id']))
+                                                                            <a href="{{ route('skema-sertifikasi.unit-kompetensi.elemen.edit', [$data->id, $unit['id']]) }}"
+                                                                                class="btn btn-outline-primary btn-sm"
+                                                                                title="Kelola Elemen & KUK">
+                                                                                <i
+                                                                                    class="mdi mdi-format-list-bulleted"></i>
+                                                                            </a>
+                                                                        @endif
+                                                                        <button type="button"
+                                                                            class="btn btn-outline-danger btn-sm btn-remove-unit-kompetensi">
+                                                                            <i class="mdi mdi-trash-can-outline"></i>
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                                    id="btn-add-unit-kompetensi">
+                                                    <i class="mdi mdi-plus-circle me-1"></i> Tambah Unit Kompetensi
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {{-- Template FR.MAPA.01/02 per metode (hanya untuk skema yang sudah tersimpan) --}}
+                                    @isset($data)
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="mb-3">
+                                                    <label class="form-label mb-0">Template MAPA (FR.MAPA.01 &amp; FR.MAPA.02)</label>
+                                                    <p class="text-muted small mb-2">Rencana asesmen per unit, konfirmasi orang yang relevan,
+                                                        serta penyusun &amp; validator untuk setiap metode. Simpan perubahan unit terlebih dahulu.</p>
+                                                    @foreach (['kt' => 'KT', 'tpd' => 'TPD', 'vp' => 'VP'] as $kodeMetode => $labelMetode)
+                                                        <a href="{{ route('skema-sertifikasi.mapa.edit', [$data->id, $kodeMetode]) }}"
+                                                            class="btn btn-outline-secondary btn-sm me-1">
+                                                            <i class="mdi mdi-file-document-edit-outline me-1"></i> Template {{ $labelMetode }}
+                                                        </a>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endisset
+
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <div class="mb-3">
+                                                <label class="form-label mb-0">Bukti Persyaratan Dasar</label>
+                                                <p class="text-muted small mb-2">Daftar bukti/dokumen persyaratan
+                                                    dasar yang harus dilampirkan asesi untuk skema ini (ex: SK
+                                                    pengangkatan jabatan, sertifikat pelatihan, dll).</p>
+
+                                                <div class="table-responsive">
+                                                    @php
+                                                        $oldBukti = old('bukti_persyaratan_dasar');
+
+                                                        if ($oldBukti) {
+                                                            // old() balikin shape mentah dari input form:
+                                                            // ['id' => [...], 'deskripsi' => [...]]
+                                                            // -> perlu di-"zip" jadi array per-baris biar bisa di-foreach.
+                                                            $buktiRows = [];
+                                                            foreach ($oldBukti['deskripsi'] ?? [] as $i => $deskripsi) {
+                                                                $buktiRows[] = [
+                                                                    'id' => $oldBukti['id'][$i] ?? null,
+                                                                    'deskripsi' => $deskripsi,
+                                                                ];
+                                                            }
+                                                        } elseif (isset($data)) {
+                                                            $buktiRows = $data->buktiPersyaratanDasar
+                                                                ->map(
+                                                                    fn($b) => [
+                                                                        'id' => $b->id,
+                                                                        'deskripsi' => $b->deskripsi,
+                                                                    ],
+                                                                )
+                                                                ->all();
+                                                        } else {
+                                                            $buktiRows = [
+                                                                [
+                                                                    'id' => null,
+                                                                    'deskripsi' => '',
+                                                                ],
+                                                            ];
+                                                        }
+                                                    @endphp
+                                                    <table class="table table-bordered align-middle mb-2"
+                                                        id="bukti-persyaratan-dasar-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style="width: 60px;">No</th>
+                                                                <th>Deskripsi Bukti Persyaratan</th>
+                                                                <th style="width: 60px;"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="bukti-persyaratan-dasar-rows">
+                                                            @foreach ($buktiRows as $index => $bukti)
+                                                                <tr class="bukti-persyaratan-dasar-row">
+                                                                    <td class="text-center bukti-row-no">
+                                                                        {{ $index + 1 }}</td>
+                                                                    <td>
+                                                                        <input type="hidden"
+                                                                            name="bukti_persyaratan_dasar[id][]"
+                                                                            value="{{ $bukti['id'] ?? '' }}">
+                                                                        <input type="text"
+                                                                            name="bukti_persyaratan_dasar[deskripsi][]"
+                                                                            class="form-control"
+                                                                            placeholder="ex: SK pengangkatan jabatan Meeting/Conference Project Manager"
+                                                                            value="{{ $bukti['deskripsi'] ?? '' }}">
+                                                                    </td>
+                                                                    <td class="text-center">
+                                                                        <button type="button"
+                                                                            class="btn btn-outline-danger btn-sm btn-remove-bukti-persyaratan-dasar">
+                                                                            <i class="mdi mdi-trash-can-outline"></i>
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                                    id="btn-add-bukti-persyaratan-dasar">
+                                                    <i class="mdi mdi-plus-circle me-1"></i> Tambah Bukti Persyaratan
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
@@ -310,6 +555,124 @@
                     }
                 });
             });
+
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+            const rowsBody = document.getElementById('unit-kompetensi-rows');
+            const addBtn = document.getElementById('btn-add-unit-kompetensi');
+
+            function renumberRows() {
+                rowsBody.querySelectorAll('.unit-kompetensi-row').forEach((row, index) => {
+                    row.querySelector('.unit-row-no').textContent = index + 1;
+                });
+            }
+
+            function buildRow() {
+                const row = document.createElement('tr');
+                row.className = 'unit-kompetensi-row';
+                row.innerHTML = `
+                    <td class="text-center unit-row-no"></td>
+                    <td>
+                        <input type="hidden" name="unit_kompetensi[id][]" value="">
+                        <input type="text" name="unit_kompetensi[kode_unit][]" class="form-control"
+                            placeholder="ex: N.79KEW00.001.2">
+                    </td>
+                    <td>
+                        <input type="text" name="unit_kompetensi[judul_unit][]" class="form-control"
+                            placeholder="Judul Unit Kompetensi">
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-remove-unit-kompetensi">
+                            <i class="mdi mdi-trash-can-outline"></i>
+                        </button>
+                    </td>
+                `;
+                return row;
+            }
+
+            if (addBtn) {
+                addBtn.addEventListener('click', function() {
+                    rowsBody.appendChild(buildRow());
+                    renumberRows();
+                });
+            }
+
+            if (rowsBody) {
+                rowsBody.addEventListener('click', function(e) {
+                    const removeBtn = e.target.closest('.btn-remove-unit-kompetensi');
+                    if (!removeBtn) return;
+
+                    const rows = rowsBody.querySelectorAll('.unit-kompetensi-row');
+                    if (rows.length <= 1) {
+                        removeBtn.closest('.unit-kompetensi-row').querySelectorAll('input').forEach(
+                            input => input.value = '');
+                        return;
+                    }
+
+                    removeBtn.closest('.unit-kompetensi-row').remove();
+                    renumberRows();
+                });
+            }
+
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+            const rowsBody = document.getElementById('bukti-persyaratan-dasar-rows');
+            const addBtn = document.getElementById('btn-add-bukti-persyaratan-dasar');
+
+            function renumberRows() {
+                rowsBody.querySelectorAll('.bukti-persyaratan-dasar-row').forEach((row, index) => {
+                    row.querySelector('.bukti-row-no').textContent = index + 1;
+                });
+            }
+
+            function buildRow() {
+                const row = document.createElement('tr');
+                row.className = 'bukti-persyaratan-dasar-row';
+                row.innerHTML = `
+                    <td class="text-center bukti-row-no"></td>
+                    <td>
+                        <input type="hidden" name="bukti_persyaratan_dasar[id][]" value="">
+                        <input type="text" name="bukti_persyaratan_dasar[deskripsi][]" class="form-control"
+                            placeholder="ex: SK pengangkatan jabatan Meeting/Conference Project Manager">
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-remove-bukti-persyaratan-dasar">
+                            <i class="mdi mdi-trash-can-outline"></i>
+                        </button>
+                    </td>
+                `;
+                return row;
+            }
+
+            if (addBtn) {
+                addBtn.addEventListener('click', function() {
+                    rowsBody.appendChild(buildRow());
+                    renumberRows();
+                });
+            }
+
+            if (rowsBody) {
+                rowsBody.addEventListener('click', function(e) {
+                    const removeBtn = e.target.closest('.btn-remove-bukti-persyaratan-dasar');
+                    if (!removeBtn) return;
+
+                    const rows = rowsBody.querySelectorAll('.bukti-persyaratan-dasar-row');
+                    if (rows.length <= 1) {
+                        removeBtn.closest('.bukti-persyaratan-dasar-row').querySelectorAll('input').forEach(
+                            input => input.value = '');
+                        return;
+                    }
+
+                    removeBtn.closest('.bukti-persyaratan-dasar-row').remove();
+                    renumberRows();
+                });
+            }
 
         });
     </script>

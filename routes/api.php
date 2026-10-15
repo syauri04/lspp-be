@@ -1,32 +1,35 @@
 <?php
 
 use App\Http\Controllers\API\AboutPageController;
+use App\Http\Controllers\API\Auth\ChangePasswordController;
+use App\Http\Controllers\API\Auth\GoogleLoginController;
+use App\Http\Controllers\API\Auth\LoginController;
+use App\Http\Controllers\API\Auth\LogoutController;
+use App\Http\Controllers\API\Auth\MeController;
+use App\Http\Controllers\API\Auth\RegisterController;
+use App\Http\Controllers\API\Auth\ResendVerificationController;
+use App\Http\Controllers\API\Auth\SetPasswordController;
+use App\Http\Controllers\API\Auth\UpdateProfileController;
+use App\Http\Controllers\API\Auth\VerifyEmailController;
 use App\Http\Controllers\API\CalendarsController;
 use App\Http\Controllers\API\FaqController;
 use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\HeroBannerController;
+use App\Http\Controllers\API\MitraController;
+use App\Http\Controllers\API\Muk\Apl01BuktiController as MukApl01BuktiController;
+use App\Http\Controllers\API\Muk\Apl02BuktiController as MukApl02BuktiController;
+use App\Http\Controllers\API\Muk\Auth\MukAuthController;
+use App\Http\Controllers\API\Muk\DokumenController as MukDokumenController;
+use App\Http\Controllers\API\Muk\MetodeController as MukMetodeController;
+use App\Http\Controllers\API\Muk\PenilaianController as MukPenilaianController;
 use App\Http\Controllers\API\NewsArticleController;
+use App\Http\Controllers\API\Pendaftaran\CheckoutController;
+use App\Http\Controllers\API\Pendaftaran\DokuWebhookController;
+use App\Http\Controllers\API\Pendaftaran\PendaftaranSertifikasiController;
 use App\Http\Controllers\API\SertifikasiController;
 use App\Http\Controllers\API\StrukturController;
 use App\Http\Controllers\API\TukController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\Auth\{
-    ChangePasswordController,
-    GoogleLoginController,
-    RegisterController,
-    LoginController,
-    LogoutController,
-    MeController,
-    VerifyEmailController,
-    ResendVerificationController,
-    SetPasswordController,
-    UpdateProfileController,
-};
-
-use App\Http\Controllers\API\MitraController;
-use App\Http\Controllers\API\Pendaftaran\CheckoutController;
-use App\Http\Controllers\API\Pendaftaran\DokuWebhookController;
-use App\Http\Controllers\API\Pendaftaran\PendaftaranSertifikasiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,7 +48,8 @@ Route::prefix('auth')->group(function () {
     Route::post('email/resend', ResendVerificationController::class)
         ->middleware('throttle:3,1');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    // asesi.website: tolak token asesor & token khusus MUK di endpoint akun lspp-fe
+    Route::middleware(['auth:sanctum', 'asesi.website'])->group(function () {
         Route::post('logout', LogoutController::class);
         Route::get('me', MeController::class);
 
@@ -57,6 +61,82 @@ Route::prefix('auth')->group(function () {
     Route::post('google', GoogleLoginController::class)->middleware('throttle:5,1');
 });
 
+/*
+|--------------------------------------------------------------------------
+| MUK Paperless (sertifikasi.lspp306.com)
+|--------------------------------------------------------------------------
+| Login terpisah dari lspp-fe: token MUK hanya berability "muk:asesi" /
+| "muk:asesor" dan berumur config('muk.token_ttl_minutes'). Asesor HANYA
+| bisa login di sini. Peran dicek oleh middleware 'muk.role'.
+*/
+
+Route::prefix('muk')->group(function () {
+    Route::prefix('auth')->group(function () {
+        Route::middleware('throttle:muk-login')->group(function () {
+            Route::post('asesi/login', [MukAuthController::class, 'loginAsesi']);
+            Route::post('asesor/login', [MukAuthController::class, 'loginAsesor']);
+        });
+
+        Route::middleware(['auth:sanctum', 'muk.role:asesi,asesor', 'throttle:60,1'])->group(function () {
+            Route::get('me', [MukAuthController::class, 'me']);
+            Route::post('logout', [MukAuthController::class, 'logout']);
+        });
+    });
+
+    // Terbuka untuk asesi & asesor; hasil di-scope per pemilik di controller.
+    Route::middleware(['auth:sanctum', 'muk.role:asesi,asesor', 'throttle:60,1'])->group(function () {
+        Route::get('penilaian', [MukPenilaianController::class, 'index']);
+        Route::get('penilaian/{penilaian}', [MukPenilaianController::class, 'show'])->whereNumber('penilaian');
+
+        // Dokumen (generik per slug: apl-01, apl-02, ...). Baca: asesi & asesor (dicek policy).
+        Route::get('penilaian/{penilaian}/dokumen/{slug}', [MukDokumenController::class, 'show'])->whereNumber('penilaian');
+        Route::get('penilaian/{penilaian}/dokumen/{slug}/tanda-tangan/{pihak}', [MukDokumenController::class, 'gambarTandaTangan'])->whereNumber('penilaian');
+        Route::get('penilaian/{penilaian}/dokumen/{slug}/penandatangan/{penandatangan}', [MukDokumenController::class, 'gambarPenandatangan'])
+            ->whereNumber(['penilaian', 'penandatangan']);
+        Route::get('penilaian/{penilaian}/dokumen/apl-01/bukti/{bukti}', [MukApl01BuktiController::class, 'show'])
+            ->whereNumber(['penilaian', 'bukti']);
+        Route::get('penilaian/{penilaian}/dokumen/apl-02/bukti/{bukti}/file', [MukApl02BuktiController::class, 'show'])
+            ->whereNumber(['penilaian', 'bukti']);
+    });
+
+    // Tinjauan asesor (FR.APL.02) & penentuan metode asesmen.
+    Route::middleware(['auth:sanctum', 'muk.role:asesor', 'throttle:muk-aksi'])
+        ->prefix('penilaian/{penilaian}')
+        ->whereNumber('penilaian')
+        ->group(function () {
+            Route::post('dokumen/{slug}/review', [MukDokumenController::class, 'review']);
+            Route::post('metode', [MukMetodeController::class, 'store']);
+        });
+
+    // Unggah / hapus berkas bukti persyaratan dasar FR.APL.01 (asesi).
+    Route::middleware(['auth:sanctum', 'muk.role:asesi', 'throttle:muk-aksi'])
+        ->prefix('penilaian/{penilaian}/dokumen/apl-01/bukti/{bukti}')
+        ->whereNumber(['penilaian', 'bukti'])
+        ->group(function () {
+            Route::post('/', [MukApl01BuktiController::class, 'store']);
+            Route::delete('/', [MukApl01BuktiController::class, 'destroy']);
+        });
+
+    // Unggah / hapus berkas "bukti yang relevan" FR.APL.02 (asesi).
+    Route::middleware(['auth:sanctum', 'muk.role:asesi', 'throttle:muk-aksi'])
+        ->prefix('penilaian/{penilaian}/dokumen/apl-02')
+        ->whereNumber('penilaian')
+        ->group(function () {
+            Route::post('elemen/{elemen}/bukti', [MukApl02BuktiController::class, 'store'])->whereNumber('elemen');
+            Route::delete('bukti/{bukti}/file', [MukApl02BuktiController::class, 'destroy'])->whereNumber('bukti');
+        });
+
+    // Pengisian dokumen oleh pengisinya (asesi: APL; asesor: MAPA) — dicek policy 'isi'.
+    // Rate limit per user: autosave lebih longgar, ttd/submit lebih ketat.
+    Route::middleware(['auth:sanctum', 'muk.role:asesi,asesor'])
+        ->prefix('penilaian/{penilaian}/dokumen/{slug}')
+        ->whereNumber('penilaian')
+        ->group(function () {
+            Route::patch('/', [MukDokumenController::class, 'update'])->middleware('throttle:muk-tulis');
+            Route::post('tanda-tangan', [MukDokumenController::class, 'tandaTangan'])->middleware('throttle:muk-aksi');
+            Route::post('submit', [MukDokumenController::class, 'submit'])->middleware('throttle:muk-aksi');
+        });
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -72,7 +152,7 @@ Route::middleware('auth:sanctum', 'throttle:60,1')
 
 Route::middleware([
     'auth:sanctum',
-    'throttle:60,1'
+    'throttle:60,1',
 ])
     ->group(function () {
 
@@ -95,19 +175,19 @@ Route::middleware([
         // Homepage
         Route::get('/news/home', [
             NewsArticleController::class,
-            'home'
+            'home',
         ]);
 
         // List berita + pagination
         Route::get('/news', [
             NewsArticleController::class,
-            'index'
+            'index',
         ]);
 
         // Detail berita
         Route::get('/news/{slug}', [
             NewsArticleController::class,
-            'detail'
+            'detail',
         ]);
 
         /*
@@ -150,19 +230,19 @@ Route::middleware([
             // Category
             Route::get('/categories', [
                 SertifikasiController::class,
-                'categories'
+                'categories',
             ]);
 
             // List
             Route::get('/', [
                 SertifikasiController::class,
-                'index'
+                'index',
             ]);
 
             // Detail
             Route::get('/{slug}', [
                 SertifikasiController::class,
-                'detail'
+                'detail',
             ]);
         });
 
@@ -174,7 +254,7 @@ Route::middleware([
 
         Route::get('/calendars', [
             CalendarsController::class,
-            'index'
+            'index',
         ]);
 
         /*
@@ -185,13 +265,13 @@ Route::middleware([
 
         Route::get('/faqs', [
             FaqController::class,
-            'index'
+            'index',
         ]);
 
         // Mitra
         Route::get('/mitras', [
             MitraController::class,
-            'index'
+            'index',
         ]);
     });
 
@@ -211,7 +291,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])
 
         Route::get('/{pendaftaran:kode_pendaftaran}', [
             PendaftaranSertifikasiController::class,
-            'show'
+            'show',
         ]);
 
         Route::post('/', [PendaftaranSertifikasiController::class, 'store'])
@@ -232,12 +312,12 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])
 
         Route::get('/{pendaftaran:kode_pendaftaran}', [
             CheckoutController::class,
-            'show'
+            'show',
         ]);
 
         Route::post('/{pendaftaran:kode_pendaftaran}/pay', [
             CheckoutController::class,
-            'pay'
+            'pay',
         ])->middleware('throttle:20,1');
 
         // Route::post('/{pendaftaran:kode_pendaftaran}/snap-token', [

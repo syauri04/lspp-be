@@ -2,9 +2,12 @@
 
 use App\Http\Controllers\CMS\AboutPageController;
 use App\Http\Controllers\CMS\AsesiController;
+use App\Http\Controllers\CMS\AsesmenController;
+use App\Http\Controllers\CMS\AsesorController;
 use App\Http\Controllers\CMS\CalendarController;
 use App\Http\Controllers\CMS\CategorySkemaSertifikasiController;
 use App\Http\Controllers\CMS\DivisionController;
+use App\Http\Controllers\CMS\ElemenKompetensiController;
 use App\Http\Controllers\CMS\FaqController;
 use App\Http\Controllers\CMS\GalleryAlbumController;
 use App\Http\Controllers\CMS\HeroBannerController;
@@ -13,6 +16,9 @@ use App\Http\Controllers\CMS\MitraController;
 use App\Http\Controllers\CMS\NewsArticleController;
 use App\Http\Controllers\CMS\NewsCategoryController;
 use App\Http\Controllers\CMS\PendaftaranSertifikasiController;
+use App\Http\Controllers\CMS\MapaTemplateController;
+use App\Http\Controllers\CMS\PenjadwalanAsesmenController;
+use App\Http\Controllers\CMS\ReviewApl01Controller;
 use App\Http\Controllers\CMS\SkemaSertifikasiController;
 use App\Http\Controllers\CMS\TinyMceController;
 use App\Http\Controllers\CMS\TUKController;
@@ -24,6 +30,28 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+
+    // Penjadwalan Asesmen
+    Route::prefix('penjadwalan-asesmen')->name('penjadwalan-asesmen.')->group(function () {
+        Route::get('/', [PenjadwalanAsesmenController::class, 'index'])->name('index');
+        Route::get('/{kodePendaftaran}/create', [PenjadwalanAsesmenController::class, 'create'])->name('create');
+        Route::post('/{kodePendaftaran}', [PenjadwalanAsesmenController::class, 'store'])->name('store');
+    });
+
+    // Review FR.APL.01 (admin LSP)
+    Route::prefix('review-apl01')->name('review-apl01.')->group(function () {
+        Route::get('/', [ReviewApl01Controller::class, 'index'])->name('index');
+        Route::get('/{dokumen}', [ReviewApl01Controller::class, 'show'])->whereNumber('dokumen')->name('show');
+        Route::post('/{dokumen}', [ReviewApl01Controller::class, 'update'])->whereNumber('dokumen')->name('update');
+        Route::get('/{dokumen}/bukti/{bukti}', [ReviewApl01Controller::class, 'bukti'])->whereNumber(['dokumen', 'bukti'])->name('bukti');
+        Route::get('/{dokumen}/tanda-tangan/{pihak}', [ReviewApl01Controller::class, 'tandaTangan'])->whereNumber('dokumen')->name('tanda-tangan');
+    });
+
+    // Asesmen
+    Route::prefix('asesmen')->name('asesmen.')->group(function () {
+        Route::get('/', [AsesmenController::class, 'index'])->name('index');
+        Route::get('/{jadwalAsesmen}', [AsesmenController::class, 'show'])->name('show');
+    });
 
     // Pendaftaran Sertifikasi
     Route::prefix('pendaftaran')
@@ -46,7 +74,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dokumen/{dokumen}/preview', [DokumenPendaftaranController::class, 'preview'])
         ->middleware('signed')
         ->name('dokumen.preview');
-
 
     Route::post('/tinymce/upload', [TinyMceController::class, 'upload'])
         ->name('tinymce.upload');
@@ -113,11 +140,25 @@ Route::middleware(['auth'])->group(function () {
         [GalleryAlbumController::class, 'reorderPhotos']
     )->name('gallery-photos.reorder');
 
-
     // Sturktur Organisasi
     Route::resource('sertifikat/skema-categories', CategorySkemaSertifikasiController::class);
 
     Route::resource('sertifikat/skema-sertifikasi', SkemaSertifikasiController::class);
+
+    Route::prefix('sertifikat/skema-sertifikasi/{skema_sertifikasi}/unit-kompetensi/{unit_kompetensi}')
+        ->name('skema-sertifikasi.unit-kompetensi.')
+        ->group(function () {
+            Route::get('elemen', [ElemenKompetensiController::class, 'edit'])->name('elemen.edit');
+            Route::put('elemen', [ElemenKompetensiController::class, 'update'])->name('elemen.update');
+        });
+
+    // Template FR.MAPA.01/02 per skema + metode (kt/tpd/vp)
+    Route::get('sertifikat/skema-sertifikasi/{skema_sertifikasi}/mapa/{metode}', [MapaTemplateController::class, 'edit'])
+        ->whereIn('metode', ['kt', 'tpd', 'vp'])->name('skema-sertifikasi.mapa.edit');
+    Route::put('sertifikat/skema-sertifikasi/{skema_sertifikasi}/mapa/{metode}', [MapaTemplateController::class, 'update'])
+        ->whereIn('metode', ['kt', 'tpd', 'vp'])->name('skema-sertifikasi.mapa.update');
+    Route::get('mapa-template/ttd/{penandatangan}', [MapaTemplateController::class, 'ttd'])
+        ->whereNumber('penandatangan')->name('mapa-template.ttd');
 
     // Calendar
     Route::resource('calendars', CalendarController::class);
@@ -132,6 +173,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Asesi
     Route::resource('asesis', AsesiController::class);
+    // Asesor
+    Route::resource('asesors', AsesorController::class);
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

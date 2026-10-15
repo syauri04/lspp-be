@@ -2,19 +2,16 @@
 
 namespace App\Models;
 
-
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 
 class PendaftaranSertifikasi extends Model
 {
-    use SoftDeletes, Notifiable;
-
-
+    use Notifiable, SoftDeletes;
 
     protected $fillable = [
         'kode_pendaftaran',
@@ -69,5 +66,15 @@ class PendaftaranSertifikasi extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function jadwalAsesmen()
+    {
+        return $this->hasOne(JadwalAsesmen::class, 'pendaftaran_sertifikasi_id');
+    }
+
+    public function penilaianMuk()
+    {
+        return $this->hasOne(PenilaianMuk::class, 'pendaftaran_sertifikasi_id');
     }
 }

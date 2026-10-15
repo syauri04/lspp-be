@@ -19,4 +19,9 @@ class TUK extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    public function jadwalAsesmens()
+    {
+        return $this->hasMany(JadwalAsesmen::class, 'tuk_id');
+    }
 }

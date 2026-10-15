@@ -34,6 +34,42 @@
                     </a>
                 </li>
 
+                <li>
+                    <a href="{{ route('penjadwalan-asesmen.index') }}" class="waves-effect">
+                        <i class="dripicons-calendar"></i>
+                        <span>Penjadwalan Asesmen</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ route('asesmen.index') }}" class="waves-effect">
+                        <i class="dripicons-view-list-large"></i>
+                        <span>Daftar Asesmen</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ route('review-apl01.index') }}" class="waves-effect">
+                        <i class="dripicons-document-edit"></i>
+                        <span>Review FR.APL.01</span>
+                    </a>
+                </li>
+
+                <li class="menu-title">Users</li>
+                <li>
+                    <a href="{{ route('asesis.index') }}" class="waves-effect">
+                        <i class="dripicons-checklist"></i>
+                        <span>Daftar Asesi</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ route('asesors.index') }}" class="waves-effect">
+                        <i class="dripicons-checklist"></i>
+                        <span>Daftar Asesor</span>
+                    </a>
+                </li>
+
                 <li class="menu-title">Content Website</li>
                 <li>
                     <a href="{{ route('hero-banner.index') }}" class="waves-effect">
@@ -127,13 +163,7 @@
                     </a>
                 </li>
 
-                <li class="menu-title">Users</li>
-                <li>
-                    <a href="{{ route('asesis.index') }}" class="waves-effect">
-                        <i class="dripicons-checklist"></i>
-                        <span>Daftar Asesi</span>
-                    </a>
-                </li>
+
 
 
             </ul>

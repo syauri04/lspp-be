@@ -48,3 +48,19 @@ function something()
 {
     // ..
 }
+
+/** PNG data URL (tanda tangan canvas) untuk test MUK. */
+function pngDataUrl(int $w = 300, int $h = 100, bool $kosong = false): string
+{
+    $img = imagecreatetruecolor($w, $h);
+    imagesavealpha($img, true);
+    imagefill($img, 0, 0, imagecolorallocatealpha($img, 0, 0, 0, 127));
+    if (! $kosong) {
+        imagesetthickness($img, 3);
+        imageline($img, 10, 10, $w - 10, $h - 10, imagecolorallocate($img, 0, 0, 0));
+    }
+    ob_start();
+    imagepng($img);
+
+    return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
+}
