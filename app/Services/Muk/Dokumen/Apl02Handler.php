@@ -47,6 +47,11 @@ class Apl02Handler implements DokumenHandler
         return 'asesor';
     }
 
+    public function penyetuju(): ?string
+    {
+        return null;
+    }
+
     public function butuhTandaTangan(): bool
     {
         return true;

@@ -23,7 +23,7 @@ class PendaftaranMasukNotifikasi extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject('Pendaftaran Sertifikasi Baru Menunggu Review')
-            ->line("Asesi {$this->pendaftaran->asesi->name} mengajukan pendaftaran untuk skema {$this->pendaftaran->skemaSertifikasi->title}.")
+            ->line("Asesi {$this->pendaftaran->asesi->name} mengajukan pendaftaran untuk skema ".($this->pendaftaran->skemaSertifikasi->title['id'] ?? '-').'.')
             ->action('Review Pendaftaran', url("/admin/pendaftaran/{$this->pendaftaran->kode_pendaftaran}"));
     }
 

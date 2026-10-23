@@ -89,6 +89,8 @@ class MetodeAsesmenService
                 'metode_ditentukan_at' => now(),
                 'status' => PenilaianMuk::STATUS_BERLANGSUNG,
             ]);
+            // Jadwal asesmen di CMS menjadi "berlangsung".
+            app(SinkronStatusAsesmen::class)->mulai($p);
 
             // Dicatat pada riwayat FR.APL.02 (dokumen yang menjadi dasar keputusan metode).
             $apl02 = $dokumen->first(fn (DokumenPenilaian $d) => $d->jenisDokumen->kode === JenisDokumenMuk::APL_02);

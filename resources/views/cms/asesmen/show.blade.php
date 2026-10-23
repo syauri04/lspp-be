@@ -121,6 +121,80 @@
                             </div>
                         </div>
 
+                        {{-- Progres MUK (dokumen asesmen) --}}
+                        @php
+                            $penilaian = $jadwalAsesmen->penilaianMuk;
+                            $statusPenilaian = [
+                                'menunggu_pengisian_apl' => ['bg-secondary', 'Menunggu pengisian APL'],
+                                'menunggu_review' => ['bg-info', 'Menunggu review'],
+                                'berlangsung' => ['bg-warning text-dark', 'Berlangsung'],
+                                'selesai_kompeten' => ['bg-success', 'Selesai - Kompeten'],
+                                'selesai_belum_kompeten' => ['bg-danger', 'Selesai - Belum Kompeten'],
+                            ];
+                            $statusDokumen = [
+                                'belum_diisi' => ['bg-light text-dark', 'Belum diisi'],
+                                'draft' => ['bg-warning text-dark', 'Draft'],
+                                'menunggu_review' => ['bg-info', 'Menunggu review'],
+                                'menunggu_persetujuan' => ['bg-info', 'Menunggu persetujuan asesi'],
+                                'selesai' => ['bg-success', 'Selesai'],
+                            ];
+                            $metodeNama = ['kt' => 'Kegiatan Terstruktur', 'tpd' => 'Tugas Praktik Demonstrasi', 'vp' => 'Verifikasi Portofolio'];
+                        @endphp
+                        @if ($penilaian)
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 class="card-title mb-0">Progres Asesmen (MUK)</h5>
+                                        @php $sp = $statusPenilaian[$penilaian->status] ?? ['bg-secondary', $penilaian->status]; @endphp
+                                        <span class="badge {{ $sp[0] }}">{{ $sp[1] }}</span>
+                                    </div>
+                                    @php
+                                        $dokumen = $penilaian->dokumenPenilaian;
+                                        $selesai = $dokumen->where('status', 'selesai')->count();
+                                    @endphp
+                                    <table class="table table-borderless table-sm mb-3">
+                                        <tbody>
+                                            <tr>
+                                                <th style="width:220px;">Metode Asesmen</th>
+                                                <td>{{ $metodeNama[$penilaian->metode_asesmen] ?? 'Belum ditentukan' }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Dokumen Selesai</th>
+                                                <td>{{ $selesai }} dari {{ $dokumen->count() }}</td>
+                                            </tr>
+                                            @if ($penilaian->selesai_at)
+                                                <tr>
+                                                    <th>Selesai Pada</th>
+                                                    <td>{{ $penilaian->selesai_at->format('d M Y, H:i') }}</td>
+                                                </tr>
+                                            @endif
+                                        </tbody>
+                                    </table>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:130px;">Kode</th>
+                                                    <th>Dokumen</th>
+                                                    <th style="width:200px;">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($dokumen->sortBy(fn ($d) => $d->jenisDokumen->urutan_default) as $d)
+                                                    @php $sd = $statusDokumen[$d->status] ?? ['bg-secondary', $d->status]; @endphp
+                                                    <tr>
+                                                        <td><code>{{ $d->jenisDokumen->kode }}</code></td>
+                                                        <td>{{ $d->jenisDokumen->nama }}</td>
+                                                        <td><span class="badge {{ $sd[0] }}">{{ $sd[1] }}</span></td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                     </div>
 
                     {{-- Kolom kanan --}}

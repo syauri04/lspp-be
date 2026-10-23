@@ -124,6 +124,21 @@ class ReviewApl01Controller extends Controller
         ], 'inline');
     }
 
+    /** Berkas lampiran bukti yang relevan (FR.APL.01 bagian 3). */
+    public function relevan(DokumenPenilaian $dokumen, int $relevan): StreamedResponse
+    {
+        $this->pastikanApl01($dokumen);
+        $row = $this->handler->relevanMilikDokumen($dokumen, $relevan);
+        abort_unless($row?->path_file && Storage::disk(Apl01Handler::disk())->exists($row->path_file), 404);
+
+        return Storage::disk(Apl01Handler::disk())->response($row->path_file, $row->nama_file_asli, [
+            'Content-Type' => $row->mime_type,
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            ...($row->mime_type === 'application/pdf' ? [] : ['Content-Security-Policy' => 'sandbox']),
+        ], 'inline');
+    }
+
     /** Gambar tanda tangan (asesi/admin) untuk ditampilkan di halaman review. */
     public function tandaTangan(DokumenPenilaian $dokumen, string $pihak, TandaTanganService $ttd): StreamedResponse
     {

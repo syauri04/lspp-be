@@ -22,6 +22,12 @@ interface DokumenHandler
     /** Peran yang meninjau & menandatangani keputusan ("admin" / "asesor"), null bila tidak ada review. */
     public function peninjau(): ?string;
 
+    /**
+     * Peran yang menyetujui dokumen dengan tanda tangan setelah pengisi mengirim (mis. asesi pada
+     * FR.AK.07 / FR.AK.01), null bila tidak ada. Tidak bisa digabung dengan peninjau.
+     */
+    public function penyetuju(): ?string;
+
     /** Apakah pengisi wajib menandatangani sebelum mengirim (MAPA: tidak). */
     public function butuhTandaTangan(): bool;
 

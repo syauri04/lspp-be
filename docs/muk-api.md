@@ -80,6 +80,13 @@ Status dokumen: `belum_diisi` → `draft` → `menunggu_review` → `selesai` (a
   - `POST /muk/penilaian/{id}/dokumen/apl-01/bukti/{buktiId}` (multipart `file`) — unggah/ganti
   - `DELETE` path yang sama — hapus
   - `GET` path yang sama — lihat berkas
+- Lampiran bukti yang relevan (payload `bukti_relevan: [{id, nama, template, link, file}]`): butir dari Template VP (CMS, `instrumen.FR.IA.08.bukti`) disinkronkan otomatis selama belum dikirim (`template: true`, tidak dapat dihapus/diganti nama); asesi dapat menambah baris sendiri (maks 20). Setiap baris berkas (PDF/JPG/PNG ≤ 5 MB) dan/atau link http(s):
+  - `POST /muk/penilaian/{id}/dokumen/apl-01/relevan` `{ nama }` — tambah baris asesi
+  - `PATCH .../relevan/{relevanId}` `{ nama?, link? }` — nama hanya baris asesi
+  - `DELETE .../relevan/{relevanId}` — hapus baris asesi (butir template → 422)
+  - `POST .../relevan/{relevanId}/file` (multipart `file`) — unggah/ganti; `DELETE` sama — hapus berkas
+  - `GET .../relevan/{relevanId}/file` — lihat berkas (asesi; asesor setelah APL.01 dikirim, untuk IA.08)
+  - Perubahan menghapus tanda tangan asesi (sama seperti isian lain). Opsional saat submit.
 - Submit: data pribadi wajib (kecuali kode pos & telp rumah/kantor), tujuan asesmen, **minimal satu** berkas bukti persyaratan dasar, tanda tangan.
 - Peninjau: **admin LSP** di CMS (`/review-apl01`).
 
@@ -104,7 +111,57 @@ Status dokumen: `belum_diisi` → `draft` → `menunggu_review` → `selesai` (a
 - MAPA.02 PATCH body: `{ "isian": { "potensi": { "ia01": [1,3], "ia04a": [], ... } } }`; selesaikan bila minimal satu potensi dicentang.
 - `POST .../submit` → status langsung `selesai`; template + **salinan** gambar ttd dibekukan ke snapshot (perubahan template sesudahnya tidak berpengaruh).
 - Gambar ttd penandatangan: `GET /muk/penilaian/{id}/dokumen/{mapa-01|mapa-02}/penandatangan/{penandatanganId}`.
-- Dokumen AK/IA terbuka setelah kedua MAPA `selesai`.
+- Dokumen AK terbuka setelah kedua MAPA `selesai`; dokumen IA terbuka setelah FR.AK.07 & FR.AK.01 `selesai` (disetujui asesi). AK.07 & AK.01 boleh diisi dengan urutan bebas.
+
+### FR.AK.07 (`ak-07`) & FR.AK.01 (`ak-01`) — asesor isi, asesi setujui
+- Alur: asesor PATCH isian → `POST .../tanda-tangan` (ttd asesor) → `POST .../submit` → status **`menunggu_persetujuan`** (email ke asesi) → asesi `POST .../setujui` `{tanda_tangan}` → **`selesai`** (email ke asesor).
+- `POST .../tarik` (asesor): kembali `draft` selama asesi belum menyetujui. Isi berubah setelah ditandatangani → ttd asesor dihapus.
+- Asesi baru bisa membuka dokumen setelah dikirim asesor (sebelumnya 403 "Dokumen sedang disiapkan asesor."). Asesi tidak bisa PATCH.
+- Payload meta tambahan: `penyetuju` ("asesi"), `persetujuan` `{bisa, alasan}` (khusus penyetuju), `dapat_ditarik`.
+- AK.07 PATCH: `{ "isian": { tuk: sewaktu|tempat_kerja|mandiri, tanggal: Y-m-d, potensi: ["1".."5"], karakter: { k1..k8: { penyesuaian: ya|tidak, pilihan: [indeks], lainnya: [{teks, checked}] } }, hasil: { acuan, metode, instrumen } } }`
+  - Isian awal: tanggal (jadwal), potensi (MAPA.01 §1.1), acuan (standar kompetensi), metode, instrumen IA sesuai metode.
+  - Kirim: TUK, tanggal, potensi ≥ 1, setiap baris Ya/Tidak (Ya → ≥ 1 keterangan), hasil 1–3 terisi, ttd asesor.
+- AK.01 PATCH: `{ "isian": { tuk, bukti: [portofolio|observasi|lisan|lainnya|reviu_produk|kegiatan_terstruktur|tertulis|wawancara], bukti_lainnya, pelaksanaan: { tanggal, waktu, tuk } } }`
+  - Isian awal: TUK (dari AK.07), bukti (rencana MAPA.01: kolom metode + kode DPL/DPT/PW), pelaksanaan (jadwal & TUK).
+  - Kirim: TUK, bukti ≥ 1 (Lainnya wajib ditulis), pelaksanaan lengkap, ttd asesor.
+
+### FR.IA.01 / IA.02 / IA.03 (`ia-01`, `ia-02`, `ia-03`): metode TPD
+- Alur sama dengan AK.07/AK.01: asesor isi + ttd → kirim → asesi `setujui` dengan ttd → selesai (bisa `tarik`).
+- Terbuka setelah AK.07 & AK.01 selesai. Isian awal: TUK (AK.01/AK.07), tanggal (jadwal).
+- IA.01 PATCH: `{ isian: { tuk, tanggal, elemen: { "e{elemenId}": { standar, pencapaian: ya|tidak, lanjut } }, umpan_balik, rekomendasi: kompeten|lanjutan, lanjutan: { kelompok, unit, elemen, kuk } } }`. Struktur unit/elemen/KUK dari skema (`struktur`, dibekukan di snapshot). Kirim: semua elemen dinilai, rekomendasi "kompeten" ditolak bila ada elemen "tidak", lanjutan wajib menyebut unit, umpan balik wajib.
+- IA.02 PATCH: `{ isian: { tuk, tanggal } }`. Skenario, waktu & penyusun/validator dari Template TPD (CMS), dibekukan + salinan ttd saat dikirim; gambar ttd via `.../penandatangan/{id}`. Kirim ditolak bila skenario belum diisi di CMS (`errors.instrumen`).
+- IA.03 (asesor isi + ttd → asesi setujui, seperti IA.09): `{ isian: { tuk, tanggal, jawaban: [{tanggapan, pencapaian}], tambahan: [{teks, tanggapan, pencapaian}] (maks 10), umpan_balik } }`. Tanggapan asesi **dicatat asesor**. Pertanyaan dari Template TPD (`instrumen.FR.IA.03`) disalin ke `isian.pertanyaan` saat pertama disimpan (tidak bisa dikirim klien). Kirim: TUK, tanggal, ≥ 1 pertanyaan, setiap pertanyaan bertanggapan & Ya/Tidak, umpan balik. Asesi melihat setelah dikirim.
+  - Migrasi `2026_10_27_100000_fr_ia_03_tanggapan_diisi_asesor`: data alur sebelumnya (persiapan/penilaian di `data_review`) dikonversi; dokumen selesai tetap selesai, yang berjalan menjadi draft asesor (tanggapan dipertahankan, ttd asesi dikosongkan). Data lama diarsip di `data_review.arsip_alur_asesi` (dipulihkan oleh `down()`).
+- CMS Template TPD (`/sertifikat/skema-sertifikasi/{skema}/mapa/tpd`): skenario & waktu IA.02, penyusun/validator IA.02, daftar pertanyaan IA.03 (kolom `mapa_templates.instrumen`).
+
+### FR.IA.06A / 06B / 06C (`ia-06a`, `ia-06b`, `ia-06c`): semua metode
+- Soal esai, kunci jawaban, waktu & penyusun/validator IA.06B diisi admin di CMS: **Template Umum** (`/sertifikat/skema-sertifikasi/{skema}/mapa/umum`), satu kali per skema untuk semua metode.
+- IA.06A (asesor siapkan → asesi jawab): `PATCH .../ia-06a/persiapan` `{ persiapan: { tuk, tanggal, waktu } }` → `POST .../ia-06a/buka` (soal + kunci dibekukan di data_review; email ke asesi) → asesi `PATCH .../ia-06a` `{ isian: { jawaban: [teks] } }` → `submit` (tanpa ttd, semua jawaban wajib) → `selesai` (email ke asesor). **Kunci jawaban tidak pernah ada di payload IA.06A.**
+- IA.06B (hanya asesor; asesi 403 "Dokumen ini hanya untuk asesor."): soal + kunci (mengikuti IA.06A), header, penyusun/validator. Tanpa isian (PATCH ditolak); `POST .../ia-06b/submit` langsung dari `belum_diisi` → `selesai`, isi + salinan ttd penyusun dibekukan (tanggal = tanggal diselesaikan).
+- IA.06C (pola AK: asesor isi + ttd → asesi setujui): terbuka setelah IA.06A `selesai` ("Menunggu asesi mengirim jawaban FR.IA.06A."). PATCH `{ isian: { pencapaian: [ya|tidak], umpan_balik } }`; payload `jawaban_asesi: [{pertanyaan, jawaban}]` tanpa kunci. Kirim: semua pencapaian & umpan balik wajib.
+
+### Penutup: FR.AK.02 / 03 / 05 / 06 (`ak-02`, `ak-03`, `ak-05`, `ak-06`)
+- **AK.02** Rekaman Asesmen (pola AK: asesor isi + ttd → asesi setujui). Terbuka setelah **semua dokumen IA selesai**. PATCH `{ isian: { tuk, tanggal_mulai, tanggal_selesai, bukti: { "u{unitId}": [observasi|portofolio|pihak_ketiga|wawancara|lisan|tertulis|proyek_kerja|lainnya] }, rekomendasi: kompeten|belum_kompeten, tindak_lanjut, komentar } }`.
+  - Isian awal: bukti per unit dari dokumen IA metode; payload `indikasi` = hasil "belum tercapai" di IA.01/IA.03/IA.06C.
+  - Kirim: TUK, tanggal (selesai ≥ mulai), setiap unit ≥ 1 bukti, rekomendasi; BK → tindak lanjut wajib; K padahal ada indikasi → komentar (alasan) wajib.
+- **AK.03** Umpan Balik — diisi **asesi** setelah AK.02 selesai, tanpa ttd: `{ isian: { komponen: [{hasil: ya|tidak, catatan}] x9, catatan_lainnya } }` → submit → selesai. Asesor membaca setelah dikirim.
+- **AK.05** Laporan & **AK.06** Tinjauan Proses — **hanya asesor** (asesi 403), setelah AK.02 selesai; ttd asesor → submit → selesai (tanpa persetujuan asesi). AK.05: rekomendasi mengikuti AK.02 (read-only), keterangan wajib bila BK. AK.06: prinsip per aspek ("fleksibel" tidak berlaku untuk keputusan & umpan balik), dimensi (wajib, isian awal = instrumen IA), nama peninjau.
+- **Status akhir penilaian**: begitu semua dokumen asesmen selesai **kecuali dokumen pasca-keputusan asesi** (`JenisDokumenMuk::PASCA_KEPUTUSAN`: AK.03 Umpan Balik, AK.04 Banding) → `selesai_kompeten` / `selesai_belum_kompeten` sesuai AK.02, `selesai_at` terisi, riwayat `penilaian_selesai`, jadwal & pendaftaran ikut selesai. Setelah itu semua dokumen terkunci, kecuali AK.03/AK.04 yang tetap dapat diisi asesi.
+  - Penilaian lama yang tertahan (mis. menunggu AK.03 dengan aturan lama): `php artisan muk:sinkron-penyelesaian` (`--dry-run` untuk melihat dulu). Aman dijalankan berulang.
+
+### FR.IA.08 / 09 / 10 (`ia-08`, `ia-09`, `ia-10`): metode VP
+- Terbuka setelah AK.07 & AK.01 selesai; asesi melihat setelah asesor mengirim.
+- **IA.08** (asesor isi + ttd → asesi setujui): `{ isian: { tuk, tanggal, portofolio: [{bukti, relevan_id, valid, asli, terkini, memadai}], klarifikasi: ["u{unitId}"], materi: ["k{kukId}"], bukti_tambahan, rekomendasi: kompeten|lanjutan, lanjutan: { jenis: observasi|kegiatan_terstruktur, unit: ["u{unitId}"], kuk: ["k{kukId}"] } } }`. Isian awal portofolio = lampiran bukti relevan APL.01 yang berisi berkas/link (`relevan_id` menunjuk barisnya; id milik penilaian lain dibuang); payload `lampiran` (berkas/link untuk dibuka asesor) & `kuk`. `materi` = KUK yang tampil di tabel klarifikasi (Materi/Substansi Wawancara): awal dari Template VP (`instrumen.FR.IA.08.materi`, id KUK), dapat ditambah/hapus asesor; kunci di luar skema dibuang. Kirim: ≥ 1 bukti, setiap bukti 4 aturan terisi, rekomendasi (lanjutan → `jenis` & ≥ 1 unit wajib; KUK opsional, kosong = seluruh KUK unit; KUK di luar unit terpilih dibuang).
+  - **Asesmen lanjutan (BNSP):** saat IA.08 **selesai** (disetujui asesi) dengan rekomendasi lanjutan, dokumen dibuat otomatis: `observasi` → FR.IA.01/02/03 (TPD), `kegiatan_terstruktur` → FR.IA.04A/04B (KT). Metode utama tetap VP. Dokumen lanjutan hanya memuat unit (IA.01: juga KUK) dalam lingkup; template IA.02/03 dari Template TPD, IA.04A/B dari Template KT. AK.02: indikasi FR.IA.08 & bukti observasi/proyek hanya pada unit lingkup. Penilaian selesai setelah dokumen lanjutan juga selesai.
+- **IA.09** (asesor isi + ttd → asesi setujui): `{ isian: { tuk, tanggal, bukti: [teks], jawaban: [{kesimpulan, pencapaian}], tambahan: [{teks, kesimpulan, pencapaian}] } }`. Pertanyaan dari Template VP (CMS, `instrumen.FR.IA.09`) disalin saat pertama disimpan (tidak bisa dikirim klien); bukti awal = lampiran bukti relevan APL.01 (berisi berkas/link). Pertanyaan tambahan di FE berisi awal "Sesuai dengan bukti No. … Yang anda ajukan, ceritakan pengalaman anda …". Penyusun/validator `penyusun_ia09` dibekukan + salinan ttd + tanggal kirim. Kirim: setiap pertanyaan berkesimpulan & berpencapaian.
+- **IA.10** (asesor isi + ttd → Selesaikan, tanpa persetujuan asesi): `{ isian: { tuk, tanggal, pengawas: {nama, tempat_kerja, alamat, telepon}, jawaban: [ya|tidak] x6, hubungan, lama_bekerja, kedekatan, pengalaman, keyakinan, kebutuhan_pelatihan, komentar } }`. Isian awal tempat kerja/alamat/telepon dari APL.01. Kirim: nama pengawas, 6 jawaban, keyakinan.
+- CMS Template VP: daftar bukti portofolio IA.08 (→ APL.01 lampiran bukti relevan), materi/substansi wawancara IA.08 (dropdown KUK per unit/elemen), pertanyaan wawancara IA.09 & penyusun/validator IA.09.
+
+### FR.IA.04A / 04B (`ia-04a`, `ia-04b`): metode KT
+- Terbuka setelah AK.07 & AK.01 selesai; asesi melihat setelah asesor mengirim.
+- **IA.04A** (asesor isi + ttd → asesi setujui): `{ isian: { tuk, umpan_balik, supervisor } }`. Payload `instrumen: {hal_disiapkan, hal_didemonstrasikan, waktu_pengerjaan, waktu_tanya_jawab, total_waktu}` (waktu opsional) dari Template KT (CMS, `instrumen.FR.IA.04A`), tidak bisa diubah klien; `unit_kompetensi`; `penyusun` (`penyusun_ia04a`). Supervisor hanya nama (opsional), umpan balik opsional. Kirim: TUK wajib; ditolak (`instrumen`) bila instruksi CMS kosong. Instruksi, penyusun + salinan ttd + tanggal kirim dibekukan.
+- **IA.04B** (asesor isi + ttd → asesi setujui): `{ isian: { tuk, tanggal, jawaban: [{tanggapan, pencapaian, kesesuaian}], tambahan: [{lingkup, pertanyaan, kesesuaian, tanggapan, pencapaian}] (maks 10), rekomendasi_teks, rekomendasi: kompeten|belum_kompeten } }`. `isian.aspek` (lingkup/pertanyaan/kesesuaian) dari Template KT disalin saat pertama disimpan dan tidak bisa dikirim klien; `jawaban` sejajar `aspek`; `jawaban.*.kesesuaian` awal dari template dan dapat diubah asesor. Tanggapan asesi dicatat asesor. Kirim: TUK, tanggal, ≥ 1 aspek/tambahan, setiap baris Ya/Tidak, rekomendasi; `kompeten` ditolak bila ada aspek "Tidak". Hasil "Tidak"/Belum Kompeten tampil sebagai indikasi di AK.02.
+- CMS Template KT: instruksi IA.04A, daftar aspek IA.04B, penyusun/validator IA.04A & IA.04B.
 
 ## 5. Tinjauan (review)
 

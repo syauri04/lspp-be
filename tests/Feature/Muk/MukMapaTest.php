@@ -54,7 +54,8 @@ function mapaSiap(bool $templateLengkap = true): array
 
     $konfirmasi = $template->penandatangan()->where('bagian', 'konfirmasi')->first();
     Storage::disk('local')->put('mapa-template/ttd-uji.png', base64_decode(explode(',', pngDataUrl())[1]));
-    $konfirmasi->update(['nama' => 'Dr. Manajer', 'path_ttd' => 'mapa-template/ttd-uji.png']);
+    // Tanggal lama di DB diabaikan: tanggal ttd diisi otomatis saat dokumen dikirim.
+    $konfirmasi->update(['nama' => 'Dr. Manajer', 'path_ttd' => 'mapa-template/ttd-uji.png', 'tanggal' => '2020-01-01']);
     $template->penandatangan()->create(['bagian' => 'penyusun_mapa02', 'peran' => 'penyusun', 'nama' => 'Penyusun Dua', 'urutan' => 1]);
 
     return [$p->fresh(), MukFixture::token($asesor), MukFixture::token($asesi), $konfirmasi->id];
@@ -93,6 +94,7 @@ describe('FR.MAPA.01', function () {
             ->assertJsonPath('data.template_lengkap', true)
             ->assertJsonPath('data.konfirmasi_orang.0.nama', 'Dr. Manajer')
             ->assertJsonPath('data.konfirmasi_orang.0.ada_ttd', true)
+            ->assertJsonPath('data.konfirmasi_orang.0.tanggal', null)
             ->assertJsonCount(2, 'data.rencana');
 
         expect($res->json('data.isian.modifikasi.peluang_terintegrasi.catatan'))->toContain('Unit 1')
@@ -143,7 +145,11 @@ describe('FR.MAPA.01', function () {
         // Template diubah setelah selesai -> dokumen tetap memakai snapshot.
         MapaTemplateRencana::query()->update(['bukti' => 'Diubah admin']);
         Storage::disk('local')->delete('mapa-template/ttd-uji.png');
-        $this->withToken($token)->getJson($url)->assertJsonPath('data.rencana.0.bukti', 'Hasil Verifikasi Portofolio');
+        $this->withToken($token)->getJson($url)
+            ->assertJsonPath('data.rencana.0.bukti', 'Hasil Verifikasi Portofolio')
+            ->assertJsonPath('data.konfirmasi_orang.0.tanggal', now('Asia/Jakarta')->toDateString())
+            // Baris tanpa tanda tangan tidak diberi tanggal.
+            ->assertJsonPath('data.konfirmasi_orang.1.tanggal', null);
         $this->withToken($token)->get("{$url}/penandatangan/{$pid}")->assertOk()->assertHeader('Content-Type', 'image/png');
 
         $this->withToken($token)->patchJson($url, ['isian' => isianMapa01Lengkap()])->assertForbidden();

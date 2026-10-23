@@ -20,6 +20,12 @@
         'selesai' => 'bg-success',
         'dibatalkan' => 'bg-danger',
     ];
+    // Hasil & metode dari penilaian MUK.
+    $hasilBadge = [
+        'selesai_kompeten' => ['bg-success', 'Kompeten'],
+        'selesai_belum_kompeten' => ['bg-danger', 'Belum Kompeten'],
+    ];
+    $metodeLabel = ['kt' => 'KT', 'tpd' => 'TPD', 'vp' => 'VP'];
 @endphp
 
 @section('content')
@@ -72,11 +78,18 @@
                                         </select>
                                     </div>
                                     <div class="col-auto">
+                                        <select name="hasil" class="form-select">
+                                            <option value="">-- Semua Hasil --</option>
+                                            <option value="kompeten" {{ request('hasil') === 'kompeten' ? 'selected' : '' }}>Kompeten</option>
+                                            <option value="belum_kompeten" {{ request('hasil') === 'belum_kompeten' ? 'selected' : '' }}>Belum Kompeten</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
                                         <button type="submit" class="btn btn-outline-secondary">
                                             <i class="mdi mdi-filter-variant me-1"></i> Filter
                                         </button>
                                     </div>
-                                    @if (request()->filled('status'))
+                                    @if (request()->filled('status') || request()->filled('hasil'))
                                         <div class="col-auto">
                                             <a href="{{ route('asesmen.index') }}" class="btn btn-light">Reset</a>
                                         </div>
@@ -93,7 +106,9 @@
                                             <th>Asesor</th>
                                             <th>TUK</th>
                                             <th>Tanggal &amp; Waktu</th>
+                                            <th>Metode</th>
                                             <th>Status</th>
+                                            <th>Hasil</th>
                                             <th class="dt-action">Aksi</th>
                                         </tr>
                                     </thead>
@@ -117,10 +132,19 @@
                                                         @endif
                                                     </div>
                                                 </td>
+                                                <td>{{ $metodeLabel[$item->penilaianMuk?->metode_asesmen] ?? '-' }}</td>
                                                 <td>
                                                     <span class="badge {{ $statusBadge[$item->status] ?? 'bg-secondary' }}">
                                                         {{ ucfirst($item->status) }}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    @if ($hasil = $hasilBadge[$item->penilaianMuk?->status] ?? null)
+                                                        <span class="badge {{ $hasil[0] }}">{{ $hasil[1] }}</span>
+                                                        <div class="text-muted small">{{ $item->penilaianMuk->selesai_at?->format('d M Y') }}</div>
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
                                                 </td>
                                                 <td class="text-center">
                                                     <a href="{{ route('asesmen.show', $item->id) }}"
@@ -131,7 +155,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="9" class="text-center">Belum ada jadwal asesmen.</td>
+                                                <td colspan="11" class="text-center">Belum ada jadwal asesmen.</td>
                                             </tr>
                                         @endforelse
                                     </tbody>

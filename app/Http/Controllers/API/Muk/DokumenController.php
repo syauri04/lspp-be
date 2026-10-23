@@ -7,15 +7,19 @@ use App\Http\Middleware\EnsureMukRole;
 use App\Http\Resources\Muk\DokumenPenilaianResource;
 use App\Models\DokumenPenilaian;
 use App\Services\Muk\AksesDokumen;
+use App\Services\Muk\Dokumen\DisiapkanDanDinilai;
+use App\Services\Muk\Dokumen\DisiapkanPeninjau;
 use App\Services\Muk\Dokumen\DokumenHandler;
-use App\Services\Muk\Dokumen\MapaHandler;
+use App\Services\Muk\Dokumen\PunyaPenandatangan;
 use App\Services\Muk\DokumenResolver;
 use App\Services\Muk\DokumenWorkflow;
+use App\Services\Muk\NotifikasiMuk;
 use App\Services\Muk\TandaTanganService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -68,6 +72,119 @@ class DokumenController extends Controller
         Gate::authorize('isi', $dokumen);
 
         $dokumen = $this->workflow->submit($dokumen, $handler, $request->user());
+
+        return self::respons($request, $dokumen, $handler);
+    }
+
+    /** Persiapan peninjau sebelum dibuka untuk pengisi (mis. TUK, tanggal, pertanyaan tambahan IA.03). */
+    public function persiapan(Request $request, int $penilaian, string $slug): DokumenPenilaianResource
+    {
+        [$dokumen, $handler] = $this->handlerPola($request, $penilaian, $slug, 'siapkan', DisiapkanPeninjau::class);
+        $validated = $request->validate($handler->rulesPersiapan($dokumen));
+
+        $dokumen = $this->workflow->ubahDataPeninjau(
+            $dokumen,
+            fn (DokumenPenilaian $d) => Gate::authorize('siapkan', $d->setRelation('penilaianMuk', $dokumen->penilaianMuk)),
+            fn (DokumenPenilaian $d) => $handler->simpanPersiapan($d, $validated),
+            $request->user(),
+            'persiapan_diubah',
+        );
+
+        return self::respons($request, $dokumen, $handler);
+    }
+
+    /** Buka dokumen untuk pengisi (daftar pertanyaan dibekukan). */
+    public function buka(Request $request, int $penilaian, string $slug, NotifikasiMuk $notifikasi): DokumenPenilaianResource
+    {
+        [$dokumen, $handler] = $this->handlerPola($request, $penilaian, $slug, 'siapkan', DisiapkanPeninjau::class);
+
+        $dokumen = $this->workflow->ubahDataPeninjau(
+            $dokumen,
+            function (DokumenPenilaian $d) use ($handler, $dokumen) {
+                Gate::authorize('siapkan', $d->setRelation('penilaianMuk', $dokumen->penilaianMuk));
+                $errors = $handler->kesalahanBuka($d);
+                if ($errors !== []) {
+                    throw ValidationException::withMessages(array_map(fn ($m) => [$m], $errors));
+                }
+            },
+            function (DokumenPenilaian $d) use ($handler) {
+                $handler->buka($d);
+
+                return true;
+            },
+            $request->user(),
+            'dibuka_untuk_pengisi',
+        );
+        $notifikasi->setelahDibuka($dokumen);
+
+        return self::respons($request, $dokumen, $handler);
+    }
+
+    /** Simpan draf penilaian peninjau (tanpa menyelesaikan). */
+    public function penilaian(Request $request, int $penilaian, string $slug): DokumenPenilaianResource
+    {
+        [$dokumen, $handler] = $this->handlerPola($request, $penilaian, $slug, 'nilai', DisiapkanDanDinilai::class);
+        $validated = $request->validate($handler->rulesPenilaian($dokumen));
+
+        $dokumen = $this->workflow->ubahDataPeninjau(
+            $dokumen,
+            fn (DokumenPenilaian $d) => Gate::authorize('nilai', $d->setRelation('penilaianMuk', $dokumen->penilaianMuk)),
+            fn (DokumenPenilaian $d) => $handler->simpanPenilaian($d, $validated),
+            $request->user(),
+            'penilaian_diubah',
+        );
+
+        return self::respons($request, $dokumen, $handler);
+    }
+
+    /** Selesaikan penilaian: penilaian (opsional, disimpan dulu) + tanda tangan peninjau -> selesai. */
+    public function nilai(Request $request, int $penilaian, string $slug): DokumenPenilaianResource
+    {
+        [$dokumen, $handler] = $this->handlerPola($request, $penilaian, $slug, 'nilai', DisiapkanDanDinilai::class);
+        $validated = $request->validate([
+            ...$handler->rulesPenilaian($dokumen),
+            'tanda_tangan' => ['required', 'string', 'max:'.(int) (config('muk.tanda_tangan.max_bytes') * 1.4)],
+        ]);
+
+        $dokumen = $this->workflow->nilaiAkhir($dokumen, $handler, $validated['penilaian'] ?? null, $validated['tanda_tangan'], $request->user());
+
+        return self::respons($request, $dokumen, $handler);
+    }
+
+    /**
+     * Dokumen + handler pola persiapan/penilaian, terotorisasi untuk aksi tsb.
+     *
+     * @param  class-string  $pola  DisiapkanPeninjau::class atau DisiapkanDanDinilai::class
+     * @return array{0: DokumenPenilaian, 1: DokumenHandler&DisiapkanPeninjau}
+     */
+    private function handlerPola(Request $request, int $penilaian, string $slug, string $aksi, string $pola): array
+    {
+        [$dokumen, $handler] = $this->resolver->temukan($request->user(), $penilaian, $slug);
+        abort_unless($handler instanceof $pola, 404);
+        Gate::authorize($aksi, $dokumen);
+
+        return [$dokumen, $handler];
+    }
+
+    /** Persetujuan pihak kedua dengan tanda tangan (mis. asesi atas FR.AK.07 / FR.AK.01) -> selesai. */
+    public function setujui(Request $request, int $penilaian, string $slug): DokumenPenilaianResource
+    {
+        [$dokumen, $handler] = $this->resolver->temukan($request->user(), $penilaian, $slug);
+        Gate::authorize('setujui', $dokumen);
+
+        $request->validate(['tanda_tangan' => ['required', 'string', 'max:'.(int) (config('muk.tanda_tangan.max_bytes') * 1.4)]]);
+        $dokumen = $this->workflow->setujui($dokumen, $handler, (string) $request->input('tanda_tangan'), $request->user());
+
+        return self::respons($request, $dokumen, $handler);
+    }
+
+    /** Pengisi menarik kembali dokumen yang belum disetujui -> draft. */
+    public function tarik(Request $request, int $penilaian, string $slug): DokumenPenilaianResource
+    {
+        [$dokumen, $handler] = $this->resolver->temukan($request->user(), $penilaian, $slug);
+        Gate::authorize('tarik', $dokumen);
+
+        $dokumen = $this->workflow->tarikKembali($dokumen, $handler, $request->user());
 
         return self::respons($request, $dokumen, $handler);
     }
@@ -139,7 +256,7 @@ class DokumenController extends Controller
     {
         [$dokumen, $handler] = $this->resolver->temukan($request->user(), $penilaian, $slug);
         Gate::authorize('view', $dokumen);
-        abort_unless($handler instanceof MapaHandler, 404);
+        abort_unless($handler instanceof PunyaPenandatangan, 404);
 
         $path = $handler->pathTtdPenandatangan($dokumen, $penandatangan);
         abort_unless($ttd->ada($path), 404);

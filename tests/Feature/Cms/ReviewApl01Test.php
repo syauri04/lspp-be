@@ -67,6 +67,28 @@ it('daftar menampilkan APL.01 yang menunggu review dan detail bisa dibuka', func
     $this->actingAs($this->admin)->get(route('review-apl01.bukti', [$dok, BuktiPersyaratanDasar::value('id')]))->assertOk();
 });
 
+it('detail menampilkan lampiran bukti relevan yang berisi berkas/link; berkas bisa dibuka', function () {
+    [, $dok] = apl01Terkirim($this);
+    [, $lain] = apl01Terkirim($this);
+    $this->actingAs($this->admin)->get(route('review-apl01.show', $dok))->assertOk()->assertDontSee('3. Lampiran Bukti yang relevan');
+
+    Storage::disk('local')->put('apl01/x/laporan.pdf', '%PDF-1.4');
+    $laporan = $dok->buktiRelevan()->create(['kunci' => sha1('Laporan'), 'nama' => 'Laporan kegiatan', 'path_file' => 'apl01/x/laporan.pdf', 'nama_file_asli' => 'laporan.pdf', 'mime_type' => 'application/pdf']);
+    $dok->buktiRelevan()->create(['nama' => 'Sertifikat pelatihan', 'link' => 'https://contoh.id/sertifikat']);
+    $dok->buktiRelevan()->create(['kunci' => sha1('Kosong'), 'nama' => 'Butir kosong']);
+
+    $this->actingAs($this->admin)->get(route('review-apl01.show', $dok))->assertOk()
+        ->assertSee('3. Lampiran Bukti yang relevan')
+        ->assertSee('laporan.pdf')
+        ->assertSee('https://contoh.id/sertifikat')
+        ->assertSee('Tambahan asesi')
+        ->assertDontSee('Butir kosong');
+    $this->actingAs($this->admin)->get(route('review-apl01.relevan', [$dok, $laporan->id]))->assertOk();
+
+    // Lampiran dokumen lain -> 404.
+    $this->actingAs($this->admin)->get(route('review-apl01.relevan', [$lain, $laporan->id]))->assertNotFound();
+});
+
 it('menolak akses tanpa login dan dokumen yang bukan APL.01', function () {
     [$p, $dok, , $token] = apl01Terkirim($this);
 

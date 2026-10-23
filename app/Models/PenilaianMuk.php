@@ -110,14 +110,27 @@ class PenilaianMuk extends Model
         $query->whereNotIn('status', self::STATUS_SELESAI);
 
         if ($peran === 'asesi') {
+            // Asesi: APL yang belum dikirim, atau dokumen asesor yang menunggu persetujuannya (AK.07/AK.01).
             return $query->whereHas('dokumenPenilaian', fn (Builder $d) => $d
-                ->whereIn('status', [DokumenPenilaian::STATUS_BELUM_DIISI, DokumenPenilaian::STATUS_DRAFT]));
+                ->where(fn (Builder $w) => $w
+                    ->where(fn (Builder $apl) => $apl
+                        ->whereHas('jenisDokumen', fn (Builder $j) => $j->whereIn('kode', JenisDokumenMuk::APL))
+                        ->whereIn('status', [DokumenPenilaian::STATUS_BELUM_DIISI, DokumenPenilaian::STATUS_DRAFT]))
+                    ->orWhere('status', DokumenPenilaian::STATUS_MENUNGGU_PERSETUJUAN)
+                    // Dokumen yang sudah dibuka asesor untuk dijawab (mis. FR.IA.03) tapi belum dikirim.
+                    ->orWhere(fn (Builder $jawab) => $jawab
+                        ->whereIn('status', [DokumenPenilaian::STATUS_BELUM_DIISI, DokumenPenilaian::STATUS_DRAFT])
+                        ->whereNotNull('data_review->persiapan->dibuka_at'))));
         }
 
         // Asesor: ada APL.02 yang menunggu review (dan APL.01 sudah diterima admin), atau
-        // APL.02 sudah direkomendasikan "dapat dilanjutkan" tapi metode asesmen belum dipilih.
+        // APL.02 sudah direkomendasikan "dapat dilanjutkan" tapi metode asesmen belum dipilih, atau
+        // jawaban asesi pada dokumen asesmen (mis. FR.IA.03) menunggu dinilai.
         return $query->where(fn (Builder $w) => $w
-            ->where(fn (Builder $r) => $r
+            ->whereHas('dokumenPenilaian', fn (Builder $d) => $d
+                ->where('status', DokumenPenilaian::STATUS_MENUNGGU_REVIEW)
+                ->whereHas('jenisDokumen', fn (Builder $j) => $j->whereNotIn('kode', JenisDokumenMuk::APL)))
+            ->orWhere(fn (Builder $r) => $r
                 ->whereHas('dokumenPenilaian', fn (Builder $d) => $d
                     ->kode(JenisDokumenMuk::APL_02)
                     ->where('status', DokumenPenilaian::STATUS_MENUNGGU_REVIEW))

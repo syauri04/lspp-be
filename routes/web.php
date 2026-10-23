@@ -11,12 +11,12 @@ use App\Http\Controllers\CMS\ElemenKompetensiController;
 use App\Http\Controllers\CMS\FaqController;
 use App\Http\Controllers\CMS\GalleryAlbumController;
 use App\Http\Controllers\CMS\HeroBannerController;
+use App\Http\Controllers\CMS\MapaTemplateController;
 use App\Http\Controllers\CMS\MemberController;
 use App\Http\Controllers\CMS\MitraController;
 use App\Http\Controllers\CMS\NewsArticleController;
 use App\Http\Controllers\CMS\NewsCategoryController;
 use App\Http\Controllers\CMS\PendaftaranSertifikasiController;
-use App\Http\Controllers\CMS\MapaTemplateController;
 use App\Http\Controllers\CMS\PenjadwalanAsesmenController;
 use App\Http\Controllers\CMS\ReviewApl01Controller;
 use App\Http\Controllers\CMS\SkemaSertifikasiController;
@@ -44,6 +44,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{dokumen}', [ReviewApl01Controller::class, 'show'])->whereNumber('dokumen')->name('show');
         Route::post('/{dokumen}', [ReviewApl01Controller::class, 'update'])->whereNumber('dokumen')->name('update');
         Route::get('/{dokumen}/bukti/{bukti}', [ReviewApl01Controller::class, 'bukti'])->whereNumber(['dokumen', 'bukti'])->name('bukti');
+        Route::get('/{dokumen}/relevan/{relevan}', [ReviewApl01Controller::class, 'relevan'])->whereNumber(['dokumen', 'relevan'])->name('relevan');
         Route::get('/{dokumen}/tanda-tangan/{pihak}', [ReviewApl01Controller::class, 'tandaTangan'])->whereNumber('dokumen')->name('tanda-tangan');
     });
 
@@ -154,9 +155,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Template FR.MAPA.01/02 per skema + metode (kt/tpd/vp)
     Route::get('sertifikat/skema-sertifikasi/{skema_sertifikasi}/mapa/{metode}', [MapaTemplateController::class, 'edit'])
-        ->whereIn('metode', ['kt', 'tpd', 'vp'])->name('skema-sertifikasi.mapa.edit');
+        ->whereIn('metode', ['kt', 'tpd', 'vp', 'umum'])->name('skema-sertifikasi.mapa.edit');
     Route::put('sertifikat/skema-sertifikasi/{skema_sertifikasi}/mapa/{metode}', [MapaTemplateController::class, 'update'])
-        ->whereIn('metode', ['kt', 'tpd', 'vp'])->name('skema-sertifikasi.mapa.update');
+        ->whereIn('metode', ['kt', 'tpd', 'vp', 'umum'])->name('skema-sertifikasi.mapa.update');
     Route::get('mapa-template/ttd/{penandatangan}', [MapaTemplateController::class, 'ttd'])
         ->whereNumber('penandatangan')->name('mapa-template.ttd');
 

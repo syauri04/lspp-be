@@ -2,16 +2,19 @@
 
 namespace App\Services\Muk\Dokumen;
 
+use App\Models\Apl01BuktiRelevan;
 use App\Models\Apl01VerifikasiPersyaratan;
 use App\Models\Asesi;
 use App\Models\DokumenPenilaian;
 use App\Models\JenisDokumenMuk;
+use App\Models\MapaTemplate;
 use App\Models\PendaftaranSertifikasi;
 use App\Models\SkemaSertifikasi;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * FR.APL.01 Permohonan Sertifikasi Kompetensi (diisi asesi, ditinjau admin LSP).
@@ -22,6 +25,9 @@ use Illuminate\Validation\Rule;
  *   Butir sering berupa alternatif ("..., atau;"), jadi minimal SATU berkas wajib saat submit.
  * - Bukti administratif (KTP, pas foto) = berkas dari pendaftaran lspp-fe (read-only).
  * - Data skema/unit/bukti dari relasi (bukan input), dibekukan ke snapshot saat submit.
+ * - Lampiran bukti yang relevan (apl01_bukti_relevans): butir dari Template VP (CMS, FR.IA.08 bukti portofolio)
+ *   + tambahan asesi; tiap baris berkas dan/atau link. Butir template tidak dapat dihapus asesi.
+ *   Dipakai sebagai bukti portofolio FR.IA.08 & FR.IA.09 (metode VP). Opsional saat submit.
  */
 class Apl01Handler implements DokumenHandler
 {
@@ -49,6 +55,9 @@ class Apl01Handler implements DokumenHandler
 
     public const BUKTI_MAX_KB = 5120;
 
+    // Maksimal baris bukti relevan tambahan asesi (di luar butir template).
+    public const MAKS_RELEVAN_TAMBAHAN = 20;
+
     // Wajib diisi sebelum submit. Data pekerjaan opsional (asesi bisa belum bekerja).
     private const WAJIB_PRIBADI = [
         'nama_lengkap', 'nik', 'tempat_lahir', 'tanggal_lahir', 'jenis_kelamin',
@@ -75,6 +84,11 @@ class Apl01Handler implements DokumenHandler
         return 'admin';
     }
 
+    public function penyetuju(): ?string
+    {
+        return null;
+    }
+
     public function butuhTandaTangan(): bool
     {
         return true;
@@ -94,6 +108,7 @@ class Apl01Handler implements DokumenHandler
         $jawabanBukti = $dokumen->verifikasiPersyaratan->keyBy('bukti_persyaratan_dasar_id');
 
         $prefill = $dokumen->data === null;
+        $this->sinkronRelevan($dokumen);
 
         return [
             'isian' => $prefill ? $this->prefill($pendaftaran->asesi) : $this->normalisasi($dokumen->data),
@@ -121,6 +136,7 @@ class Apl01Handler implements DokumenHandler
                     // Hasil verifikasi admin LSP: memenuhi | tidak_memenuhi | tidak_ada | null.
                     'verifikasi' => $dokumen->data_review['bukti_administratif'][$b['jenis']] ?? null,
                 ])->all(),
+            'bukti_relevan' => $dokumen->buktiRelevan()->get()->map(fn (Apl01BuktiRelevan $b) => self::barisRelevan($b))->all(),
             'admin' => ['nama' => $dokumen->direviewOlehUser?->name],
             'opsi' => [
                 'tujuan_asesmen' => collect(self::TUJUAN_LABEL)->map(fn ($label, $value) => compact('value', 'label'))->values(),
@@ -129,7 +145,7 @@ class Apl01Handler implements DokumenHandler
                     ['value' => 'perempuan', 'label' => 'Wanita'],
                 ],
             ],
-            'unggah' => ['mimes' => self::BUKTI_MIMES, 'max_kb' => self::BUKTI_MAX_KB],
+            'unggah' => ['mimes' => self::BUKTI_MIMES, 'max_kb' => self::BUKTI_MAX_KB, 'maks_relevan_tambahan' => self::MAKS_RELEVAN_TAMBAHAN],
         ];
     }
 
@@ -237,6 +253,157 @@ class Apl01Handler implements DokumenHandler
             "bukti-{$buktiId}-".Str::uuid().".{$ext}",
             self::disk(),
         );
+    }
+
+    /* ----------------------------- lampiran bukti yang relevan ----------------------------- */
+
+    /** Bentuk baris bukti relevan untuk API (dipakai juga FR.IA.08). */
+    public static function barisRelevan(Apl01BuktiRelevan $b): array
+    {
+        return [
+            'id' => $b->id,
+            'nama' => $b->nama,
+            'template' => $b->dariTemplate(),
+            'link' => $b->link,
+            'file' => $b->path_file ? ['nama' => $b->nama_file_asli, 'mime' => $b->mime_type, 'ukuran_kb' => $b->ukuran_file] : null,
+        ];
+    }
+
+    /** Butir bukti portofolio dari Template VP skema (CMS). */
+    public function templateRelevan(DokumenPenilaian $dokumen): array
+    {
+        $template = MapaTemplate::query()
+            ->where('skema_sertifikasi_id', $dokumen->penilaianMuk->pendaftaran->skema_sertifikasi_id)
+            ->where('metode', 'vp')
+            ->first();
+
+        return array_values(array_unique(array_filter(array_map(
+            fn ($t) => is_string($t) && trim($t) !== '' ? mb_substr(trim($t), 0, 500) : null,
+            (array) ($template?->instrumenUntuk(MapaTemplate::IA_08)['bukti'] ?? []),
+        ))));
+    }
+
+    /**
+     * Samakan butir template dengan tabel selama asesi masih dapat mengubah dokumen (idempoten).
+     * Butir yang dihapus dari template: dibuang bila kosong, bila sudah terisi menjadi baris tambahan asesi.
+     */
+    public function sinkronRelevan(DokumenPenilaian $dokumen): void
+    {
+        if (in_array($dokumen->status, DokumenPenilaian::STATUS_TERKIRIM, true)) {
+            return;
+        }
+
+        $butir = [];
+        foreach ($this->templateRelevan($dokumen) as $i => $nama) {
+            $butir[sha1($nama)] = ['nama' => $nama, 'urutan' => $i];
+        }
+        $ada = $dokumen->buktiRelevan()->whereNotNull('kunci')->get()->keyBy('kunci');
+
+        $baru = [];
+        foreach ($butir as $kunci => $b) {
+            if (! $ada->has($kunci)) {
+                $baru[] = ['dokumen_penilaian_id' => $dokumen->id, 'kunci' => $kunci, ...$b, 'created_at' => now(), 'updated_at' => now()];
+            } elseif ($ada[$kunci]->urutan !== $b['urutan']) {
+                $ada[$kunci]->update(['urutan' => $b['urutan']]);
+            }
+        }
+        if ($baru !== []) {
+            // Unik (dokumen, kunci): aman bila dua request bersamaan.
+            Apl01BuktiRelevan::insertOrIgnore($baru);
+        }
+
+        // Catatan: except() pada koleksi Eloquent memakai primary key model, jadi pakai reject() per kunci.
+        foreach ($ada->reject(fn ($row, string $kunci) => isset($butir[$kunci])) as $lama) {
+            $lama->terisi()
+                ? $lama->update(['kunci' => null, 'urutan' => 1000 + $lama->id])
+                : $lama->delete();
+        }
+    }
+
+    public function relevanMilikDokumen(DokumenPenilaian $dokumen, int $id): ?Apl01BuktiRelevan
+    {
+        return Apl01BuktiRelevan::where('dokumen_penilaian_id', $dokumen->id)->whereKey($id)->first();
+    }
+
+    /** Tambah baris bukti relevan asesi. Dipanggil di dalam lock workflow. */
+    public function tambahRelevan(DokumenPenilaian $dokumen, string $nama): bool
+    {
+        if ($dokumen->buktiRelevan()->whereNull('kunci')->count() >= self::MAKS_RELEVAN_TAMBAHAN) {
+            throw ValidationException::withMessages(['nama' => 'Maksimal '.self::MAKS_RELEVAN_TAMBAHAN.' bukti tambahan.']);
+        }
+        $dokumen->buktiRelevan()->create(['nama' => trim($nama), 'urutan' => 1000 + (int) $dokumen->buktiRelevan()->max('id') + 1]);
+
+        return true;
+    }
+
+    /** Ubah nama (hanya baris tambahan asesi) dan/atau link. */
+    public function ubahRelevan(DokumenPenilaian $dokumen, int $id, array $data): bool
+    {
+        $row = $this->relevanMilikDokumen($dokumen, $id) ?? abort(404);
+        if (array_key_exists('nama', $data)) {
+            if ($row->dariTemplate() && trim((string) $data['nama']) !== $row->nama) {
+                throw ValidationException::withMessages(['nama' => 'Nama bukti dari template tidak dapat diubah.']);
+            }
+            $row->nama = trim((string) $data['nama']);
+        }
+        if (array_key_exists('link', $data)) {
+            $row->link = filled($data['link']) ? trim($data['link']) : null;
+        }
+        if (! $row->isDirty()) {
+            return false;
+        }
+        $row->save();
+
+        return true;
+    }
+
+    public function hapusRelevan(DokumenPenilaian $dokumen, int $id, array &$hapusNanti): bool
+    {
+        $row = $this->relevanMilikDokumen($dokumen, $id) ?? abort(404);
+        if ($row->dariTemplate()) {
+            throw ValidationException::withMessages(['relevan' => 'Bukti dari template tidak dapat dihapus. Kosongkan berkas/link bila tidak ada.']);
+        }
+        if ($row->path_file) {
+            $hapusNanti[] = [self::disk(), $row->path_file];
+        }
+        $row->delete();
+
+        return true;
+    }
+
+    public function tulisBerkasRelevan(DokumenPenilaian $dokumen, UploadedFile $file): string
+    {
+        $ext = $file->guessExtension() ?: 'bin';
+
+        return $file->storeAs("apl01/{$dokumen->penilaian_muk_id}", 'relevan-'.Str::uuid().".{$ext}", self::disk());
+    }
+
+    public function simpanBerkasRelevan(DokumenPenilaian $dokumen, int $id, string $pathBaru, UploadedFile $file, array &$hapusNanti): bool
+    {
+        $row = $this->relevanMilikDokumen($dokumen, $id) ?? abort(404);
+        if ($row->path_file) {
+            $hapusNanti[] = [self::disk(), $row->path_file];
+        }
+        $row->update([
+            'path_file' => $pathBaru,
+            'nama_file_asli' => Str::limit($file->getClientOriginalName(), 200, ''),
+            'mime_type' => $file->getMimeType(),
+            'ukuran_file' => (int) ceil($file->getSize() / 1024),
+        ]);
+
+        return true;
+    }
+
+    public function hapusBerkasRelevan(DokumenPenilaian $dokumen, int $id, array &$hapusNanti): bool
+    {
+        $row = $this->relevanMilikDokumen($dokumen, $id) ?? abort(404);
+        if (! $row->path_file) {
+            return false;
+        }
+        $hapusNanti[] = [self::disk(), $row->path_file];
+        $row->update(['path_file' => null, 'nama_file_asli' => null, 'mime_type' => null, 'ukuran_file' => null]);
+
+        return true;
     }
 
     public const VERIFIKASI = ['memenuhi', 'tidak_memenuhi', 'tidak_ada'];

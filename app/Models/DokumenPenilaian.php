@@ -15,10 +15,13 @@ class DokumenPenilaian extends Model
 
     public const STATUS_MENUNGGU_REVIEW = 'menunggu_review';
 
+    /** Sudah diisi & ditandatangani pengisi, menunggu tanda tangan persetujuan pihak kedua (mis. asesi pada AK.01/AK.07). */
+    public const STATUS_MENUNGGU_PERSETUJUAN = 'menunggu_persetujuan';
+
     public const STATUS_SELESAI = 'selesai';
 
-    // Sudah disubmit asesi: tidak bisa diedit asesi lagi.
-    public const STATUS_TERKIRIM = [self::STATUS_MENUNGGU_REVIEW, self::STATUS_SELESAI];
+    // Sudah dikirim pengisi: tidak bisa diedit pengisi lagi.
+    public const STATUS_TERKIRIM = [self::STATUS_MENUNGGU_REVIEW, self::STATUS_MENUNGGU_PERSETUJUAN, self::STATUS_SELESAI];
 
     protected $fillable = [
         'penilaian_muk_id',
@@ -76,6 +79,12 @@ class DokumenPenilaian extends Model
     public function verifikasiPersyaratan(): HasMany
     {
         return $this->hasMany(Apl01VerifikasiPersyaratan::class);
+    }
+
+    /** Lampiran bukti yang relevan FR.APL.01. */
+    public function buktiRelevan(): HasMany
+    {
+        return $this->hasMany(Apl01BuktiRelevan::class)->orderBy('urutan')->orderBy('id');
     }
 
     // khusus FR.APL.02

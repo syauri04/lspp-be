@@ -267,10 +267,11 @@
                                         <div class="row">
                                             <div class="col-md-12">
                                                 <div class="mb-3">
-                                                    <label class="form-label mb-0">Template MAPA (FR.MAPA.01 &amp; FR.MAPA.02)</label>
+                                                    <label class="form-label mb-0">Template Perangkat Asesmen (MAPA &amp; Instrumen IA)</label>
                                                     <p class="text-muted small mb-2">Rencana asesmen per unit, konfirmasi orang yang relevan,
-                                                        serta penyusun &amp; validator untuk setiap metode. Simpan perubahan unit terlebih dahulu.</p>
-                                                    @foreach (['kt' => 'KT', 'tpd' => 'TPD', 'vp' => 'VP'] as $kodeMetode => $labelMetode)
+                                                        penyusun &amp; validator, dan instrumen IA untuk setiap metode; template Umum berisi soal esai
+                                                        FR.IA.06 (semua metode). Simpan perubahan unit terlebih dahulu.</p>
+                                                    @foreach (['kt' => 'KT', 'tpd' => 'TPD', 'vp' => 'VP', 'umum' => 'Umum (IA.06)'] as $kodeMetode => $labelMetode)
                                                         <a href="{{ route('skema-sertifikasi.mapa.edit', [$data->id, $kodeMetode]) }}"
                                                             class="btn btn-outline-secondary btn-sm me-1">
                                                             <i class="mdi mdi-file-document-edit-outline me-1"></i> Template {{ $labelMetode }}

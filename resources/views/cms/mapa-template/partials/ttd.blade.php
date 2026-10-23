@@ -8,4 +8,4 @@
     </div>
 @endif
 <input type="file" class="form-control form-control-sm" name="{{ $nama }}[ttd]" accept="image/png,image/jpeg">
-<div class="form-text small">PNG/JPG, maks 1 MB.</div>
+<div class="form-text small">PNG/JPG, maks 1 MB. Tanggal tanda tangan terisi otomatis saat asesor mengirim dokumen.</div>

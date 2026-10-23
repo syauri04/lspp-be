@@ -91,3 +91,44 @@ it('menolak berkas tanda tangan bukan gambar & penyusun tanpa nama', function ()
 
     expect(MapaTemplatePenandatangan::where('bagian', 'penyusun_mapa02')->count())->toBe(0);
 });
+
+it('TPD: menyimpan instrumen IA.02/IA.03 & penyusun IA.02; metode lain mengabaikannya', function () {
+    $skema = MukFixture::skema();
+
+    $this->actingAs($this->admin)->get(route('skema-sertifikasi.mapa.edit', [$skema, 'tpd']))
+        ->assertOk()
+        ->assertSee('FR.IA.02 · Skenario Tugas Praktik Demonstrasi')
+        ->assertSee('FR.IA.02 · Penyusun dan Validator');
+    $this->actingAs($this->admin)->get(route('skema-sertifikasi.mapa.edit', [$skema, 'vp']))
+        ->assertOk()
+        ->assertDontSee('FR.IA.02 · Skenario');
+
+    $this->actingAs($this->admin)->put(route('skema-sertifikasi.mapa.update', [$skema, 'tpd']), [
+        'instrumen' => [
+            'ia02' => ['skenario' => '  Skenario TPD  ', 'waktu' => '20 Menit'],
+            'ia03' => ['pertanyaan' => ['Pertanyaan A?', '', '  Pertanyaan B?  ']],
+        ],
+        'penandatangan' => [
+            'penyusun_ia02' => [['peran' => 'penyusun', 'nama' => 'Penyusun IA', 'ttd' => gambarTtd()]],
+        ],
+        'ada_penyusun_ia02' => 1,
+    ])->assertSessionHasNoErrors();
+
+    $tpd = MapaTemplate::where('skema_sertifikasi_id', $skema->id)->where('metode', 'tpd')->first();
+    expect($tpd->instrumenUntuk(MapaTemplate::IA_02))->toEqual(['skenario' => 'Skenario TPD', 'waktu' => '20 Menit'])
+        ->and($tpd->instrumenUntuk(MapaTemplate::IA_03)['pertanyaan'])->toBe(['Pertanyaan A?', 'Pertanyaan B?'])
+        ->and($tpd->penandatangan()->where('bagian', 'penyusun_ia02')->first()->path_ttd)->not->toBeNull();
+
+    // Metode VP: instrumen & penyusun IA.02 diabaikan.
+    $this->actingAs($this->admin)->put(route('skema-sertifikasi.mapa.update', [$skema, 'vp']), [
+        'instrumen' => ['ia02' => ['skenario' => 'Tidak berlaku']],
+        'penandatangan' => ['penyusun_ia02' => [['peran' => 'penyusun', 'nama' => 'X']]],
+    ])->assertSessionHasNoErrors();
+    $vp = MapaTemplate::where('skema_sertifikasi_id', $skema->id)->where('metode', 'vp')->first();
+    expect($vp->instrumen)->toBeNull()
+        ->and($vp->penandatangan()->where('bagian', 'penyusun_ia02')->exists())->toBeFalse();
+
+    $this->actingAs($this->admin)->put(route('skema-sertifikasi.mapa.update', [$skema, 'tpd']), [
+        'instrumen' => ['ia03' => ['pertanyaan' => array_fill(0, 51, 'x')]],
+    ])->assertSessionHasErrors('instrumen.ia03.pertanyaan');
+});

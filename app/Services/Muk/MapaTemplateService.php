@@ -21,6 +21,7 @@ class MapaTemplateService
         'kt' => 'KT – Kegiatan Terstruktur',
         'tpd' => 'TPD – Tugas Praktik Demonstrasi',
         'vp' => 'VP – Verifikasi Portofolio',
+        MapaTemplate::UMUM => 'Umum – FR.IA.06 (semua metode)',
     ];
 
     public function __construct(private TandaTanganService $ttd) {}
@@ -30,7 +31,8 @@ class MapaTemplateService
     {
         $template = MapaTemplate::firstOrCreate(['skema_sertifikasi_id' => $skema->id, 'metode' => $metode]);
 
-        if (! $template->penandatangan()->where('bagian', 'konfirmasi')->exists()) {
+        // Baris konfirmasi tetap hanya untuk template MAPA (bukan template umum).
+        if ($metode !== MapaTemplate::UMUM && ! $template->penandatangan()->where('bagian', 'konfirmasi')->exists()) {
             foreach (MapaTemplate::PERAN_KONFIRMASI as $i => $peran) {
                 $template->penandatangan()->create(['bagian' => 'konfirmasi', 'peran' => $peran, 'urutan' => $i]);
             }
@@ -64,13 +66,83 @@ class MapaTemplateService
     }
 
     /**
+     * Bersihkan isi instrumen IA dari form: hanya kode & key yang dikenal, teks di-trim,
+     * pertanyaan kosong dibuang.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function normalisasiInstrumen(array $instrumen): array
+    {
+        $teks = fn ($v) => is_string($v) && trim($v) !== '' ? trim($v) : null;
+        $hasil = [];
+
+        if (array_key_exists(MapaTemplate::IA_02, $instrumen)) {
+            $hasil[MapaTemplate::IA_02] = [
+                'skenario' => $teks($instrumen[MapaTemplate::IA_02]['skenario'] ?? null),
+                'waktu' => $teks($instrumen[MapaTemplate::IA_02]['waktu'] ?? null),
+            ];
+        }
+        if (array_key_exists(MapaTemplate::IA_06, $instrumen)) {
+            $hasil[MapaTemplate::IA_06] = [
+                'waktu' => $teks($instrumen[MapaTemplate::IA_06]['waktu'] ?? null),
+                // Soal tanpa pertanyaan dibuang; kunci jawaban opsional per soal.
+                'soal' => array_values(array_filter(array_map(fn ($s) => [
+                    'pertanyaan' => $teks($s['pertanyaan'] ?? null),
+                    'kunci' => $teks($s['kunci'] ?? null),
+                ], (array) ($instrumen[MapaTemplate::IA_06]['soal'] ?? [])), fn ($s) => $s['pertanyaan'] !== null)),
+            ];
+        }
+        if (array_key_exists(MapaTemplate::IA_04A, $instrumen)) {
+            $hasil[MapaTemplate::IA_04A] = [
+                'hal_disiapkan' => $teks($instrumen[MapaTemplate::IA_04A]['hal_disiapkan'] ?? null),
+                'hal_didemonstrasikan' => $teks($instrumen[MapaTemplate::IA_04A]['hal_didemonstrasikan'] ?? null),
+                // Waktu (poin 1 & 2) dan total waktu; opsional.
+                'waktu_pengerjaan' => $teks($instrumen[MapaTemplate::IA_04A]['waktu_pengerjaan'] ?? null),
+                'waktu_tanya_jawab' => $teks($instrumen[MapaTemplate::IA_04A]['waktu_tanya_jawab'] ?? null),
+                'total_waktu' => $teks($instrumen[MapaTemplate::IA_04A]['total_waktu'] ?? null),
+            ];
+        }
+        if (array_key_exists(MapaTemplate::IA_04B, $instrumen)) {
+            // Aspek tanpa pertanyaan dibuang.
+            $hasil[MapaTemplate::IA_04B] = [
+                'aspek' => array_values(array_filter(array_map(fn ($a) => [
+                    'lingkup' => $teks($a['lingkup'] ?? null),
+                    'pertanyaan' => $teks($a['pertanyaan'] ?? null),
+                    'kesesuaian' => $teks($a['kesesuaian'] ?? null),
+                ], (array) ($instrumen[MapaTemplate::IA_04B]['aspek'] ?? [])), fn ($a) => $a['pertanyaan'] !== null)),
+            ];
+        }
+        if (array_key_exists(MapaTemplate::IA_08, $instrumen)) {
+            // Nama bukti unik (dipakai sebagai kunci baris di FR.APL.01).
+            $hasil[MapaTemplate::IA_08] = [
+                'bukti' => array_values(array_unique(array_filter(array_map($teks, (array) ($instrumen[MapaTemplate::IA_08]['bukti'] ?? []))))),
+                // Materi/substansi wawancara: id KUK terpilih (kepemilikan skema dicek di controller).
+                'materi' => array_values(array_unique(array_filter(array_map('intval', (array) ($instrumen[MapaTemplate::IA_08]['materi'] ?? [])), fn ($id) => $id > 0))),
+            ];
+        }
+        if (array_key_exists(MapaTemplate::IA_09, $instrumen)) {
+            $hasil[MapaTemplate::IA_09] = [
+                'pertanyaan' => array_values(array_filter(array_map($teks, (array) ($instrumen[MapaTemplate::IA_09]['pertanyaan'] ?? [])))),
+            ];
+        }
+        if (array_key_exists(MapaTemplate::IA_03, $instrumen)) {
+            $hasil[MapaTemplate::IA_03] = [
+                'pertanyaan' => array_values(array_filter(array_map($teks, (array) ($instrumen[MapaTemplate::IA_03]['pertanyaan'] ?? [])))),
+            ];
+        }
+
+        return $hasil;
+    }
+
+    /**
      * Simpan template dari form CMS.
      *
      * @param  array<int, array<string, mixed>>  $rencana  unit_kompetensi_id => kolom §2
      * @param  array<string, array<int, array<string, mixed>>>  $penandatangan  bagian => baris
      * @param  array<string, array<int, UploadedFile>>  $berkasTtd  bagian => [index => berkas]
+     * @param  array<string, array<string, mixed>>|null  $instrumen  kode dokumen IA => isi (null = tidak diubah)
      */
-    public function simpan(MapaTemplate $template, array $rencana, array $penandatangan, array $berkasTtd): void
+    public function simpan(MapaTemplate $template, array $rencana, array $penandatangan, array $berkasTtd, ?array $instrumen = null): void
     {
         $unitSah = $template->skema->unitKompetensis()->pluck('id')->all();
 
@@ -86,7 +158,12 @@ class MapaTemplateService
         $hapusNanti = [];
 
         try {
-            DB::transaction(function () use ($template, $rencana, $penandatangan, $unitSah, $berkasBaru, &$hapusNanti) {
+            DB::transaction(function () use ($template, $rencana, $penandatangan, $instrumen, $unitSah, $berkasBaru, &$hapusNanti) {
+                if ($instrumen !== null) {
+                    $template->instrumen = [...($template->instrumen ?? []), ...self::normalisasiInstrumen($instrumen)];
+                    $template->save();
+                }
+
                 foreach ($rencana as $unitId => $kolom) {
                     if (! in_array((int) $unitId, $unitSah, true)) {
                         continue; // unit bukan milik skema ini
@@ -118,7 +195,6 @@ class MapaTemplateService
                             'peran' => $baris['peran'],
                             'nama' => $baris['nama'] ?? null,
                             'no_reg' => $baris['no_reg'] ?? null,
-                            'tanggal' => $baris['tanggal'] ?? null,
                             'urutan' => $urutan,
                         ]);
 

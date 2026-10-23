@@ -4,6 +4,9 @@ namespace App\Services\Muk;
 
 use App\Models\DokumenPenilaian;
 use App\Models\JenisDokumenMuk;
+use App\Services\Muk\Dokumen\DisiapkanPeninjau;
+use App\Services\Muk\Dokumen\DokumenHandlerRegistry;
+use App\Services\Muk\Dokumen\PunyaPrasyarat;
 use Illuminate\Support\Collection;
 
 /**
@@ -12,6 +15,8 @@ use Illuminate\Support\Collection;
  */
 class AksesDokumen
 {
+    public function __construct(private DokumenHandlerRegistry $registry) {}
+
     /**
      * @param  Collection<int, DokumenPenilaian>  $semuaDokumen  dokumen lain dalam penilaian yang sama (jenisDokumen sudah di-load)
      * @return string|null alasan terkunci, atau null bila boleh dibuka
@@ -30,7 +35,34 @@ class AksesDokumen
         if (in_array($kategori, ['AK', 'IA'], true) && ! self::mapaSelesai($semuaDokumen)) {
             return 'Menunggu FR.MAPA.01 dan FR.MAPA.02 diselesaikan asesor.';
         }
+        // Dokumen IA terbuka setelah FR.AK.07 & FR.AK.01 selesai (diisi asesor & disetujui asesi).
+        // AK.07 dan AK.01 sendiri boleh diisi dengan urutan bebas.
+        if ($kategori === 'IA' && ! self::akPraAsesmenSelesai($semuaDokumen)) {
+            return 'Menunggu FR.AK.07 dan FR.AK.01 diisi asesor dan disetujui asesi.';
+        }
         if (in_array($kategori, ['AK', 'IA'], true)) {
+            $handler = $this->registry->untukKode($kode);
+
+            // Aturan khusus dokumen (mis. IA.06B hanya asesor, IA.06C setelah IA.06A dikirim).
+            if ($handler instanceof PunyaPrasyarat && ($alasan = $handler->alasanPrasyarat($dokumen, $semuaDokumen, $peran)) !== null) {
+                return $alasan;
+            }
+
+            // Pola disiapkan -> dijawab pengisi (mis. FR.IA.03, IA.06A): pengisi baru melihat
+            // setelah penyiap membuka; penyiap selalu dapat membuka (menyiapkan & menilai).
+            if ($handler instanceof DisiapkanPeninjau) {
+                return $peran === $handler->pengisi() && ! $handler->sudahDibuka($dokumen)
+                    ? 'Dokumen sedang disiapkan asesor.'
+                    : null;
+            }
+
+            // Dokumen yang diisi pihak lain baru terlihat setelah dikirim pengisinya
+            // (mis. asesi melihat FR.AK.07 setelah asesor mengirim untuk disetujui).
+            $pengisi = $handler?->pengisi();
+            if ($pengisi !== null && $pengisi !== $peran && ! in_array($dokumen->status, DokumenPenilaian::STATUS_TERKIRIM, true)) {
+                return $pengisi === 'asesor' ? 'Dokumen sedang disiapkan asesor.' : 'Asesi belum mengirim dokumen ini.';
+            }
+
             return null;
         }
 
@@ -88,6 +120,18 @@ class AksesDokumen
         $mapa = $semuaDokumen->filter(fn (DokumenPenilaian $d) => in_array($d->jenisDokumen->kode, [JenisDokumenMuk::MAPA_01, JenisDokumenMuk::MAPA_02], true));
 
         return $mapa->count() === 2 && $mapa->every(fn (DokumenPenilaian $d) => $d->status === DokumenPenilaian::STATUS_SELESAI);
+    }
+
+    /**
+     * FR.AK.07 & FR.AK.01 sudah selesai (disetujui asesi).
+     *
+     * @param  Collection<int, DokumenPenilaian>  $semuaDokumen
+     */
+    public static function akPraAsesmenSelesai(Collection $semuaDokumen): bool
+    {
+        $ak = $semuaDokumen->filter(fn (DokumenPenilaian $d) => in_array($d->jenisDokumen->kode, [JenisDokumenMuk::AK_07, JenisDokumenMuk::AK_01], true));
+
+        return $ak->count() === 2 && $ak->every(fn (DokumenPenilaian $d) => $d->status === DokumenPenilaian::STATUS_SELESAI);
     }
 
     /** @param  Collection<int, DokumenPenilaian>  $semuaDokumen */

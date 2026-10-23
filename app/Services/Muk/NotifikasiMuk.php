@@ -6,6 +6,7 @@ use App\Models\DokumenPenilaian;
 use App\Models\JenisDokumenMuk;
 use App\Models\User;
 use App\Notifications\Muk\DokumenDitinjauNotifikasi;
+use App\Notifications\Muk\DokumenPersetujuanNotifikasi;
 use App\Notifications\Muk\DokumenSiapDitinjauNotifikasi;
 use Illuminate\Support\Facades\Log;
 
@@ -26,6 +27,40 @@ class NotifikasiMuk
                 $this->kirimKeAdmin($dokumen);
             } elseif ($kode === JenisDokumenMuk::APL_02 && $this->apl01Diterima($dokumen)) {
                 $this->kirimKeAsesor($dokumen);
+            } elseif ($dokumen->status === DokumenPenilaian::STATUS_MENUNGGU_PERSETUJUAN) {
+                // Dokumen asesor (AK.07/AK.01) menunggu tanda tangan asesi.
+                $dokumen->penilaianMuk->pendaftaran->asesi
+                    ?->notify(new DokumenPersetujuanNotifikasi($dokumen, DokumenPersetujuanNotifikasi::MINTA));
+            } elseif ($kode === JenisDokumenMuk::IA_06A
+                || ($dokumen->status === DokumenPenilaian::STATUS_MENUNGGU_REVIEW && ! in_array($kode, JenisDokumenMuk::APL, true))) {
+                // Jawaban asesi (mis. FR.IA.03, IA.06A) siap dinilai asesor.
+                $dokumen->penilaianMuk->jadwalAsesmen?->asesor
+                    ?->notify(new DokumenPersetujuanNotifikasi($dokumen, DokumenPersetujuanNotifikasi::DIJAWAB));
+            }
+        });
+    }
+
+    /** Asesor membuka dokumen untuk dijawab asesi (mis. FR.IA.03). */
+    public function setelahDibuka(DokumenPenilaian $dokumen): void
+    {
+        $this->aman(fn () => $dokumen->penilaianMuk->pendaftaran->asesi
+            ?->notify(new DokumenPersetujuanNotifikasi($dokumen, DokumenPersetujuanNotifikasi::JAWAB)));
+    }
+
+    /** Asesor selesai menilai jawaban asesi (mis. FR.IA.03). */
+    public function setelahDinilai(DokumenPenilaian $dokumen): void
+    {
+        $this->aman(fn () => $dokumen->penilaianMuk->pendaftaran->asesi
+            ?->notify(new DokumenPersetujuanNotifikasi($dokumen, DokumenPersetujuanNotifikasi::DINILAI)));
+    }
+
+    /** Pihak kedua menyetujui dokumen (mis. asesi atas AK.07/AK.01) -> kabari pengisi (asesor). */
+    public function setelahDisetujui(DokumenPenilaian $dokumen, string $pihak): void
+    {
+        $this->aman(function () use ($dokumen, $pihak) {
+            if ($pihak === 'asesi') {
+                $dokumen->penilaianMuk->jadwalAsesmen?->asesor
+                    ?->notify(new DokumenPersetujuanNotifikasi($dokumen, DokumenPersetujuanNotifikasi::DISETUJUI));
             }
         });
     }

@@ -17,6 +17,7 @@ use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\HeroBannerController;
 use App\Http\Controllers\API\MitraController;
 use App\Http\Controllers\API\Muk\Apl01BuktiController as MukApl01BuktiController;
+use App\Http\Controllers\API\Muk\Apl01RelevanController as MukApl01RelevanController;
 use App\Http\Controllers\API\Muk\Apl02BuktiController as MukApl02BuktiController;
 use App\Http\Controllers\API\Muk\Auth\MukAuthController;
 use App\Http\Controllers\API\Muk\DokumenController as MukDokumenController;
@@ -97,6 +98,8 @@ Route::prefix('muk')->group(function () {
             ->whereNumber(['penilaian', 'bukti']);
         Route::get('penilaian/{penilaian}/dokumen/apl-02/bukti/{bukti}/file', [MukApl02BuktiController::class, 'show'])
             ->whereNumber(['penilaian', 'bukti']);
+        Route::get('penilaian/{penilaian}/dokumen/apl-01/relevan/{relevan}/file', [MukApl01RelevanController::class, 'show'])
+            ->whereNumber(['penilaian', 'relevan']);
     });
 
     // Tinjauan asesor (FR.APL.02) & penentuan metode asesmen.
@@ -105,6 +108,11 @@ Route::prefix('muk')->group(function () {
         ->whereNumber('penilaian')
         ->group(function () {
             Route::post('dokumen/{slug}/review', [MukDokumenController::class, 'review']);
+            // Pola disiapkan asesor -> dijawab asesi -> dinilai asesor (mis. FR.IA.03).
+            Route::patch('dokumen/{slug}/persiapan', [MukDokumenController::class, 'persiapan']);
+            Route::post('dokumen/{slug}/buka', [MukDokumenController::class, 'buka']);
+            Route::patch('dokumen/{slug}/penilaian', [MukDokumenController::class, 'penilaian']);
+            Route::post('dokumen/{slug}/nilai', [MukDokumenController::class, 'nilai']);
             Route::post('metode', [MukMetodeController::class, 'store']);
         });
 
@@ -115,6 +123,18 @@ Route::prefix('muk')->group(function () {
         ->group(function () {
             Route::post('/', [MukApl01BuktiController::class, 'store']);
             Route::delete('/', [MukApl01BuktiController::class, 'destroy']);
+        });
+
+    // Lampiran "bukti yang relevan" FR.APL.01 (asesi): baris, link & berkas.
+    Route::middleware(['auth:sanctum', 'muk.role:asesi', 'throttle:muk-aksi'])
+        ->prefix('penilaian/{penilaian}/dokumen/apl-01/relevan')
+        ->whereNumber('penilaian')
+        ->group(function () {
+            Route::post('/', [MukApl01RelevanController::class, 'store']);
+            Route::patch('{relevan}', [MukApl01RelevanController::class, 'update'])->whereNumber('relevan');
+            Route::delete('{relevan}', [MukApl01RelevanController::class, 'destroy'])->whereNumber('relevan');
+            Route::post('{relevan}/file', [MukApl01RelevanController::class, 'unggah'])->whereNumber('relevan');
+            Route::delete('{relevan}/file', [MukApl01RelevanController::class, 'hapusBerkas'])->whereNumber('relevan');
         });
 
     // Unggah / hapus berkas "bukti yang relevan" FR.APL.02 (asesi).
@@ -135,6 +155,9 @@ Route::prefix('muk')->group(function () {
             Route::patch('/', [MukDokumenController::class, 'update'])->middleware('throttle:muk-tulis');
             Route::post('tanda-tangan', [MukDokumenController::class, 'tandaTangan'])->middleware('throttle:muk-aksi');
             Route::post('submit', [MukDokumenController::class, 'submit'])->middleware('throttle:muk-aksi');
+            // Persetujuan pihak kedua (asesi pada AK.07/AK.01) & tarik kembali oleh pengisi — dicek policy.
+            Route::post('setujui', [MukDokumenController::class, 'setujui'])->middleware('throttle:muk-aksi');
+            Route::post('tarik', [MukDokumenController::class, 'tarik'])->middleware('throttle:muk-aksi');
         });
 });
 

@@ -212,6 +212,50 @@
                                             </tbody>
                                         </table>
                                     </div>
+
+                                    {{-- Lampiran bukti yang relevan (informasi; dipakai sebagai bukti portofolio metode VP) --}}
+                                    @php
+                                        $relevanTerisi = collect($p['bukti_relevan'] ?? [])->filter(fn ($b) => $b['file'] || $b['link'])->values();
+                                    @endphp
+                                    @if ($relevanTerisi->isNotEmpty())
+                                        <h6 class="mt-3">3. Lampiran Bukti yang relevan</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-sm align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width:40px;">No</th>
+                                                        <th>Bukti</th>
+                                                        <th style="width:260px;">Berkas / Link Asesi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($relevanTerisi as $i => $b)
+                                                        <tr>
+                                                            <td class="text-center">{{ $i + 1 }}</td>
+                                                            <td>
+                                                                {{ $b['nama'] }}
+                                                                @unless ($b['template'])
+                                                                    <span class="badge bg-light text-muted border ms-1">Tambahan asesi</span>
+                                                                @endunless
+                                                            </td>
+                                                            <td>
+                                                                @if ($b['file'])
+                                                                    <a href="{{ route('review-apl01.relevan', [$dokumen, $b['id']]) }}" target="_blank" rel="noopener" class="d-block">
+                                                                        <i class="mdi mdi-file-document-outline"></i> {{ \Illuminate\Support\Str::limit($b['file']['nama'] ?? 'Berkas', 30) }}
+                                                                    </a>
+                                                                @endif
+                                                                @if ($b['link'])
+                                                                    <a href="{{ $b['link'] }}" target="_blank" rel="noopener noreferrer nofollow" class="d-block text-truncate" style="max-width:250px;" title="{{ $b['link'] }}">
+                                                                        <i class="mdi mdi-link-variant"></i> {{ $b['link'] }}
+                                                                    </a>
+                                                                @endif
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
 

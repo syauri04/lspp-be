@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Muk;
 
 use App\Models\DokumenPenilaian;
+use App\Services\Muk\Dokumen\DisiapkanPeninjau;
 use App\Services\Muk\Dokumen\DokumenHandler;
 use App\Services\Muk\DokumenWorkflow;
 use App\Services\Muk\TandaTanganService;
@@ -45,6 +46,20 @@ class DokumenPenilaianResource extends JsonResource
 
                     return ['bisa' => $hasil->allowed(), 'alasan' => $hasil->allowed() ? null : $hasil->message()];
                 }),
+                'penyetuju' => $this->handler->penyetuju(),
+                // Untuk peran penyetuju: boleh menyetujui sekarang? (alasan bila belum)
+                'persetujuan' => $this->when($this->peran === $this->handler->penyetuju(), function () use ($d) {
+                    $hasil = Gate::inspect('setujui', $d);
+
+                    return ['bisa' => $hasil->allowed(), 'alasan' => $hasil->allowed() ? null : $hasil->message()];
+                }),
+                // Pola disiapkan -> dijawab -> dinilai (mis. FR.IA.03).
+                'dinilai' => $this->when($this->handler instanceof DisiapkanPeninjau, fn () => [
+                    'dibuka' => $this->handler->sudahDibuka($d),
+                    'bisa_siapkan' => Gate::allows('siapkan', $d),
+                    'bisa_nilai' => Gate::allows('nilai', $d),
+                ]),
+                'dapat_ditarik' => $this->handler->penyetuju() !== null && Gate::allows('tarik', $d),
                 'tanda_tangan' => collect(TandaTanganService::PIHAK)->mapWithKeys(function (string $pihak) use ($d) {
                     [$path, $tanggal] = DokumenWorkflow::kolomTtd($pihak);
 
