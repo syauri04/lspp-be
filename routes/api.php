@@ -27,6 +27,7 @@ use App\Http\Controllers\API\NewsArticleController;
 use App\Http\Controllers\API\Pendaftaran\CheckoutController;
 use App\Http\Controllers\API\Pendaftaran\DokuWebhookController;
 use App\Http\Controllers\API\Pendaftaran\PendaftaranSertifikasiController;
+use App\Http\Controllers\API\Profil\NotifikasiController;
 use App\Http\Controllers\API\SertifikasiController;
 use App\Http\Controllers\API\StrukturController;
 use App\Http\Controllers\API\TukController;
@@ -306,7 +307,7 @@ Route::middleware([
 | sekaligus (KTP, ijazah, portfolio, pas foto, CV) — cegah abuse/spam submit.
 */
 
-Route::middleware(['auth:sanctum', 'throttle:60,1'])
+Route::middleware(['auth:sanctum', 'asesi.website', 'throttle:60,1'])
     ->prefix('pendaftaran-sertifikasi')
     ->group(function () {
 
@@ -319,6 +320,20 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])
 
         Route::post('/', [PendaftaranSertifikasiController::class, 'store'])
             ->middleware('throttle:5,1');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Notifikasi asesi (halaman Profil & Notifikasi lspp-fe)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth:sanctum', 'asesi.website', 'throttle:60,1'])
+    ->prefix('notifikasi')
+    ->group(function () {
+        Route::get('/', [NotifikasiController::class, 'index']);
+        Route::post('baca-semua', [NotifikasiController::class, 'bacaSemua']);
+        Route::post('{id}/baca', [NotifikasiController::class, 'baca'])->whereUuid('id');
     });
 
 /*

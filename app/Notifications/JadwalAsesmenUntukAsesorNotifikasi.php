@@ -42,6 +42,6 @@ class JadwalAsesmenUntukAsesorNotifikasi extends Notification implements ShouldQ
             ->when($jadwal->catatan, fn ($mail) => $mail->line('Catatan: '.$jadwal->catatan))
             // Deep link MUK: tidak memberi akses, asesor tetap harus login.
             ->when($jadwal->penilaianMuk, fn ($mail) => $mail
-                ->action('Buka Dokumen Sertifikasi', config('muk.frontend_url').'/penilaian/'.$jadwal->penilaianMuk->id));
+                ->action('Buka Dokumen Sertifikasi', config('muk.frontend_url').'/dashboard/penilaian/'.$jadwal->penilaianMuk->id));
     }
 }

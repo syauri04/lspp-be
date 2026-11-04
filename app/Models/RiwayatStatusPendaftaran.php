@@ -2,9 +2,13 @@
 
 namespace App\Models;
 
+use App\Observers\RiwayatStatusPendaftaranObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/** Setiap perubahan status memicu notifikasi ke asesi (lihat RiwayatStatusPendaftaranObserver). */
+#[ObservedBy(RiwayatStatusPendaftaranObserver::class)]
 class RiwayatStatusPendaftaran extends Model
 {
     public $timestamps = false; // hanya pakai created_at (lihat migration: useCurrent())

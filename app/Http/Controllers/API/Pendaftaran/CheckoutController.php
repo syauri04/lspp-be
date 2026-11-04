@@ -4,10 +4,13 @@ namespace App\Http\Controllers\API\Pendaftaran;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asesi;
+use App\Models\Pembayaran;
 use App\Models\PendaftaranSertifikasi;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -38,8 +41,7 @@ class CheckoutController extends Controller
         );
 
         if ($pembayaran->expired_at && now()->greaterThanOrEqualTo($pembayaran->expired_at)) {
-            $pembayaran->update(['status' => 'expired']);
-            $pendaftaran->update(['status' => 'expired']);
+            $this->kedaluwarsakan($pendaftaran, $pembayaran);
 
             abort(410, 'Batas waktu pembayaran untuk pendaftaran ini sudah lewat.');
         }
@@ -77,8 +79,7 @@ class CheckoutController extends Controller
         abort_if(! $pembayaran || $pembayaran->status !== 'pending', 404);
 
         if ($pembayaran->expired_at && now()->greaterThanOrEqualTo($pembayaran->expired_at)) {
-            $pembayaran->update(['status' => 'expired']);
-            $pendaftaran->update(['status' => 'expired']);
+            $this->kedaluwarsakan($pendaftaran, $pembayaran);
 
             abort(410, 'Batas waktu pembayaran untuk pendaftaran ini sudah lewat.');
         }
@@ -136,7 +137,7 @@ class CheckoutController extends Controller
         );
 
         try {
-            $response = Http::withHeaders([
+            $response = Http::connectTimeout(10)->timeout(20)->withHeaders([
                 'Client-Id' => config('services.doku.client_id'),
                 'Request-Id' => $requestId,
                 'Request-Timestamp' => $timestamp,
@@ -152,6 +153,14 @@ class CheckoutController extends Controller
             ]);
 
             abort(502, 'Gagal membuat sesi pembayaran, coba lagi beberapa saat.');
+        } catch (ConnectionException $e) {
+            // Server DOKU tidak dapat dihubungi (timeout / jaringan) -- bukan kesalahan data asesi.
+            Log::error('DOKU tidak dapat dihubungi', [
+                'kode_transaksi' => $pembayaran->kode_transaksi,
+                'error' => $e->getMessage(),
+            ]);
+
+            abort(503, 'Layanan pembayaran sedang tidak dapat dihubungi. Silakan coba beberapa saat lagi.');
         }
 
         $result = $response->json();
@@ -174,5 +183,20 @@ class CheckoutController extends Controller
         abort_unless($pendaftaran->asesi_id === $user->id, 403, 'Anda tidak memiliki akses ke pendaftaran ini.');
 
         return $user;
+    }
+
+    /** Batas bayar lewat: tandai kedaluwarsa + catat riwayat (memicu notifikasi ke asesi). */
+    private function kedaluwarsakan(PendaftaranSertifikasi $pendaftaran, Pembayaran $pembayaran): void
+    {
+        DB::transaction(function () use ($pendaftaran, $pembayaran) {
+            $statusSebelumnya = $pendaftaran->status;
+            $pembayaran->update(['status' => 'expired']);
+            $pendaftaran->update(['status' => 'expired']);
+            $pendaftaran->riwayatStatus()->create([
+                'status_dari' => $statusSebelumnya,
+                'status_ke' => 'expired',
+                'keterangan' => 'Batas waktu pembayaran telah lewat.',
+            ]);
+        });
     }
 }

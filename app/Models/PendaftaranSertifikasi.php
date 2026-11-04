@@ -13,6 +13,39 @@ class PendaftaranSertifikasi extends Model
 {
     use Notifiable, SoftDeletes;
 
+    /** Label status untuk asesi (halaman profil lspp-fe). */
+    public const STATUS_LABEL = [
+        'submitted' => 'Diajukan',
+        'approved' => 'Disetujui',
+        'awaiting_payment' => 'Menunggu pembayaran',
+        'paid' => 'Pembayaran diterima',
+        'dijadwalkan' => 'Terjadwal',
+        'asesmen_selesai' => 'Asesmen selesai',
+        'completed' => 'Selesai',
+        'rejected' => 'Ditolak',
+        'expired' => 'Kedaluwarsa',
+        'cancelled' => 'Dibatalkan',
+    ];
+
+    /** Kelompok tab filter di profil -> status yang termasuk. */
+    public const KELOMPOK = [
+        'diajukan' => ['submitted'],
+        'diproses' => ['approved', 'awaiting_payment', 'paid', 'dijadwalkan'],
+        'selesai' => ['asesmen_selesai', 'completed'],
+        'ditolak' => ['rejected', 'expired', 'cancelled'],
+    ];
+
+    public static function kelompokDari(?string $status): ?string
+    {
+        foreach (self::KELOMPOK as $kelompok => $daftar) {
+            if (in_array($status, $daftar, true)) {
+                return $kelompok;
+            }
+        }
+
+        return null;
+    }
+
     protected $fillable = [
         'kode_pendaftaran',
         'asesi_id',

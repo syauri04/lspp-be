@@ -138,7 +138,8 @@ describe('FR.AK.07', function () {
             ->assertJsonPath('data.dokumen.tanda_tangan.asesi.ada', true)
             ->assertJsonPath('data.dokumen.tanda_tangan.asesor.ada', true)
             ->assertJsonPath('data.dokumen.persetujuan.bisa', false);
-        Notification::assertSentTo($asesor, DokumenPersetujuanNotifikasi::class);
+        // Asesmen tatap muka: email "sudah disetujui" ke asesor nonaktif secara default.
+        Notification::assertNotSentTo($asesor, DokumenPersetujuanNotifikasi::class);
 
         $this->withToken($tokenAsesi)->postJson("{$url}/setujui", ['tanda_tangan' => pngDataUrl()])->assertForbidden();
         expect(RiwayatDokumenPenilaian::where('aksi', 'disetujui_asesi')->exists())->toBeTrue()

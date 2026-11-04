@@ -54,9 +54,17 @@ class NotifikasiMuk
             ?->notify(new DokumenPersetujuanNotifikasi($dokumen, DokumenPersetujuanNotifikasi::DINILAI)));
     }
 
-    /** Pihak kedua menyetujui dokumen (mis. asesi atas AK.07/AK.01) -> kabari pengisi (asesor). */
+    /**
+     * Pihak kedua menyetujui dokumen (mis. asesi atas AK.07/AK.01) -> kabari pengisi (asesor).
+     * Default nonaktif: asesmen MUK selalu tatap muka (asesor mendampingi asesi saat menyetujui), jadi email
+     * ini hanya menambah inbox asesor. Aktifkan dengan MUK_EMAIL_ASESOR_DISETUJUI=true.
+     */
     public function setelahDisetujui(DokumenPenilaian $dokumen, string $pihak): void
     {
+        if (! config('muk.notifikasi.asesor_setelah_disetujui')) {
+            return;
+        }
+
         $this->aman(function () use ($dokumen, $pihak) {
             if ($pihak === 'asesi') {
                 $dokumen->penilaianMuk->jadwalAsesmen?->asesor
@@ -95,7 +103,7 @@ class NotifikasiMuk
     private function kirimKeAsesor(DokumenPenilaian $dokumen): void
     {
         $asesor = $dokumen->penilaianMuk->jadwalAsesmen?->asesor;
-        $url = config('muk.frontend_url').'/penilaian/'.$dokumen->penilaian_muk_id;
+        $url = config('muk.frontend_url').'/dashboard/penilaian/'.$dokumen->penilaian_muk_id;
 
         $asesor?->notify(new DokumenSiapDitinjauNotifikasi($dokumen, $url));
     }

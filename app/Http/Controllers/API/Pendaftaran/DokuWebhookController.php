@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Pendaftaran;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pembayaran;
+use App\Services\Pembayaran\KonfirmasiPembayaran;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -93,31 +94,27 @@ class DokuWebhookController extends Controller
             return response()->json(['message' => 'Sudah diproses sebelumnya']);
         }
 
-        DB::transaction(function () use ($pembayaran, $statusBaru, $payload) {
-            $statusSebelumnya = $pembayaran->status;
+        if ($statusBaru === 'paid') {
+            // Lunas: pembayaran + pendaftaran + riwayat (memicu notifikasi ke asesi) dalam satu transaksi.
+            app(KonfirmasiPembayaran::class)->lunas(
+                $pembayaran,
+                'Pembayaran dikonfirmasi otomatis via webhook DOKU (channel: '.($payload['channel']['id'] ?? '-').').',
+                $payload['channel']['id'] ?? null,
+                $payload['transaction']['original_request_id'] ?? null,
+                $payload,
+            );
 
-            $pembayaran->update([
-                'status' => $statusBaru,
-                'metode_pembayaran' => $payload['channel']['id'] ?? $pembayaran->metode_pembayaran,
-                'external_transaction_id' => $payload['transaction']['original_request_id'] ?? $pembayaran->external_transaction_id,
-                'gateway_payload' => $payload,
-                'paid_at' => $statusBaru === 'paid' ? now() : $pembayaran->paid_at,
-            ]);
+            return response()->json(['message' => 'OK']);
+        }
 
-            if ($statusBaru === 'paid') {
-                $pendaftaran = $pembayaran->pendaftaranSertifikasi;
-                $pendaftaran->update(['status' => 'paid']);
-
-                $pendaftaran->riwayatStatus()->create([
-                    'status_dari' => $statusSebelumnya,
-                    'status_ke' => 'paid',
-                    'keterangan' => 'Pembayaran dikonfirmasi otomatis via webhook DOKU (channel: '
-                        . ($payload['channel']['id'] ?? '-') . ').',
-                ]);
-            }
-            // Status PENDING sengaja tidak mengubah status pendaftaran_sertifikasi --
-            // tetap 'awaiting_payment', cukup update status internal di tabel pembayaran saja.
-        });
+        // Status lain (mis. PENDING) sengaja tidak mengubah status pendaftaran_sertifikasi --
+        // tetap 'awaiting_payment', cukup update status internal di tabel pembayaran saja.
+        $pembayaran->update([
+            'status' => $statusBaru,
+            'metode_pembayaran' => $payload['channel']['id'] ?? $pembayaran->metode_pembayaran,
+            'external_transaction_id' => $payload['transaction']['original_request_id'] ?? $pembayaran->external_transaction_id,
+            'gateway_payload' => $payload,
+        ]);
 
         return response()->json(['message' => 'OK']);
     }
@@ -134,14 +131,14 @@ class DokuWebhookController extends Controller
         // Request-Target untuk HTTP Notification = path Notification URL milik MERCHANT
         // (bukan path API DOKU), sesuai dokumentasi resmi "Signature Component from Request Header".
         $components = implode("\n", [
-            'Client-Id:' . $request->header('Client-Id'),
-            'Request-Id:' . $request->header('Request-Id'),
-            'Request-Timestamp:' . $request->header('Request-Timestamp'),
-            'Request-Target:/' . ltrim($request->path(), '/'),
-            'Digest:' . $digest,
+            'Client-Id:'.$request->header('Client-Id'),
+            'Request-Id:'.$request->header('Request-Id'),
+            'Request-Timestamp:'.$request->header('Request-Timestamp'),
+            'Request-Target:/'.ltrim($request->path(), '/'),
+            'Digest:'.$digest,
         ]);
 
-        $expected = 'HMACSHA256=' . base64_encode(
+        $expected = 'HMACSHA256='.base64_encode(
             hash_hmac('sha256', $components, config('services.doku.secret_key'), true)
         );
 

@@ -1,17 +1,94 @@
 <?php
 
 use App\Models\DokumenPenilaian;
+use App\Models\JadwalAsesmen;
 use App\Models\JenisDokumenMuk;
+use App\Models\PendaftaranSertifikasi;
 use App\Models\PenilaianMuk;
+use App\Notifications\PengingatAsesmenNotifikasi;
 use App\Services\Muk\Dokumen\Ak02Handler;
 use App\Services\Muk\DokumenWorkflow;
+use App\Services\Pembayaran\KonfirmasiPembayaran;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 // Hapus token Sanctum yang sudah kedaluwarsa > 24 jam (token MUK berumur 8 jam).
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
+
+// Pengingat asesmen ke asesi H-3 & H-1 (email + notifikasi website). Aman dijalankan berulang:
+// tiap jadwal & hari hanya dikirim sekali (kunci cache + cek tabel notifications).
+Schedule::command('asesmen:kirim-pengingat')->dailyAt('07:00')->timezone('Asia/Jakarta');
+
+Artisan::command('asesmen:kirim-pengingat', function () {
+    $hariIni = now(config('muk.zona_waktu'))->startOfDay();
+    $jumlah = 0;
+
+    foreach ([3, 1] as $hari) {
+        JadwalAsesmen::query()
+            ->whereDate('tanggal_asesmen', $hariIni->copy()->addDays($hari)->toDateString())
+            ->where('status', 'terjadwal')
+            ->whereHas('pendaftaran', fn ($q) => $q->where('status', 'dijadwalkan'))
+            ->with('pendaftaran.asesi')
+            ->each(function (JadwalAsesmen $jadwal) use ($hari, &$jumlah) {
+                $asesi = $jadwal->pendaftaran?->asesi;
+                if (! $asesi) {
+                    return;
+                }
+                $sudah = $asesi->notifications()
+                    ->where('type', PengingatAsesmenNotifikasi::class)
+                    ->where('data->jadwal_id', $jadwal->id)
+                    ->where('data->hari', $hari)
+                    ->exists();
+                if ($sudah || ! Cache::add("pengingat-asesmen:{$jadwal->id}:{$hari}", true, now()->addDays(5))) {
+                    return;
+                }
+                $asesi->notify(new PengingatAsesmenNotifikasi($jadwal, $hari));
+                $jumlah++;
+            });
+    }
+
+    $this->info("{$jumlah} pengingat asesmen dikirim.");
+})->purpose('Kirim pengingat asesmen H-3 & H-1 ke asesi');
+
+// KHUSUS LOKAL: tandai pembayaran lunas tanpa DOKU (webhook DOKU sandbox mengarah ke staging, jadi
+// database lokal tidak pernah menerima konfirmasi). Alurnya sama dengan webhook: status, riwayat, notifikasi.
+Artisan::command('pembayaran:simulasi-lunas {kode : kode_pendaftaran (lihat URL checkout)}', function (string $kode) {
+    if (! app()->environment(['local', 'testing'])) {
+        $this->error('Perintah ini hanya untuk APP_ENV=local.');
+
+        return 1;
+    }
+
+    $pendaftaran = PendaftaranSertifikasi::where('kode_pendaftaran', $kode)->with('pembayaran')->first();
+    if (! $pendaftaran) {
+        $this->error("Pendaftaran {$kode} tidak ditemukan.");
+
+        return 1;
+    }
+    if (! $pendaftaran->pembayaran) {
+        $this->error('Pendaftaran ini belum punya tagihan (belum disetujui admin).');
+
+        return 1;
+    }
+    if ($pendaftaran->status !== 'awaiting_payment') {
+        $this->warn("Status pendaftaran saat ini \"{$pendaftaran->status}\", bukan menunggu pembayaran.");
+    }
+
+    $berubah = app(KonfirmasiPembayaran::class)->lunas(
+        $pendaftaran->pembayaran,
+        'SIMULASI LOKAL: pembayaran ditandai lunas tanpa DOKU.',
+        'SIMULASI_LOKAL',
+    );
+
+    $berubah
+        ? $this->info("Pembayaran {$pendaftaran->pembayaran->kode_transaksi} ditandai LUNAS (notifikasi diantrekan).")
+        : $this->warn('Pembayaran sudah lunas sebelumnya, tidak ada perubahan.');
+
+    return 0;
+})->purpose('[LOKAL] Simulasikan pembayaran lunas tanpa DOKU');
 
 // Tetapkan ulang hasil penilaian MUK yang semua dokumen asesmennya sudah selesai tapi status masih "berlangsung"
 // (mis. tertahan aturan lama yang menunggu FR.AK.03). Aman dijalankan berulang.

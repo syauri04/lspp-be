@@ -184,13 +184,24 @@ Saat dikembalikan: tanda tangan pengisi & snapshot dihapus; pengisi merevisi lal
 
 ## 8. Notifikasi email (queue)
 
+Semua notifikasi berjalan di queue (`queue:work` wajib aktif). Penerima **asesi** juga mendapat salinan
+di tabel `notifications` (channel database) yang tampil di halaman Profil/Notifikasi lspp-fe (`GET /api/notifikasi`).
+Email hanya dikirim saat giliran berpindah ke pihak lain (bukan saat simpan draf / tanda tangan).
+
 | Kejadian | Penerima | Isi |
 |---|---|---|
-| Jadwal ditentukan | asesi & asesor | Tombol deep link `MUK_URL/penilaian/{id}` |
+| Jadwal ditentukan | asesi (+database) & asesor | Tombol ke `MUK_URL/dashboard/penilaian/{id}` |
+| Pengingat H-3 & H-1 (`asesmen:kirim-pengingat`, 07:00 WIB) | asesi (+database) | Tanggal, jam, TUK, asesor |
 | APL.01 dikirim | admin & super-admin (email + dashboard) | Link ke `/review-apl01/{id}` |
 | APL.02 dikirim (APL.01 sudah diterima) / APL.01 diterima saat APL.02 menunggu | asesor | Link ke MUK |
-| Dokumen diterima / dikembalikan | asesi | Hasil + catatan + link ke MUK |
+| APL.01/APL.02 diterima / dikembalikan | asesi (+database) | Hasil + catatan + link dokumen |
+| Dokumen diisi asesor menunggu persetujuan (AK.07, AK.01, IA.01–04B, IA.06C, IA.08, IA.09, AK.02) | asesi (+database) | Link langsung `/dashboard/penilaian/{id}/dokumen/{slug}` |
+| IA.06A dibuka untuk dijawab | asesi (+database) | Link dokumen |
+| Jawaban IA.06A dikirim | asesor | Link dokumen |
+| Asesi menyetujui dokumen asesor | asesor | **Nonaktif default** (asesmen tatap muka). Aktifkan: `MUK_EMAIL_ASESOR_DISETUJUI=true` |
+| Hasil asesmen (status pendaftaran `asesmen_selesai`) | asesi (+database) | Kompeten / Belum Kompeten |
 
+Tidak mengirim email: MAPA.01/02, IA.06B, IA.10, AK.03, AK.05, AK.06.
 Deep link tidak memberi akses; penerima tetap harus login.
 
 ## 9. Audit trail

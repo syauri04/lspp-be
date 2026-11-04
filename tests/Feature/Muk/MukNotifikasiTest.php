@@ -104,7 +104,7 @@ it('APL.01 dikembalikan / diterima -> asesi diberi tahu dengan catatan & deep li
 
         return str_contains($mail->subject, 'Perlu Diperbaiki')
             && collect($mail->introLines)->contains('Catatan: KTP buram')
-            && $mail->actionUrl === config('muk.frontend_url').'/penilaian/'.$p->id;
+            && $mail->actionUrl === config('muk.frontend_url').'/dashboard/penilaian/'.$p->id.'/dokumen/apl-01';
     });
 });
 
@@ -140,12 +140,12 @@ it('APL.02 dikirim setelah APL.01 diterima -> asesor langsung diberi tahu; hasil
     Notification::assertSentTo($asesi, DokumenDitinjauNotifikasi::class, fn ($n) => str_contains($n->toMail($asesi)->subject, 'FR.APL.02'));
 });
 
-it('email jadwal memuat deep link /penilaian/{id} untuk asesi & asesor', function () {
+it('email jadwal memuat deep link /dashboard/penilaian/{id} untuk asesi & asesor', function () {
     $asesi = Asesi::factory()->create();
     $asesor = Asesor::factory()->create();
     $p = MukFixture::penilaian(asesi: $asesi, asesor: $asesor);
     $jadwal = $p->jadwalAsesmen;
-    $harapan = config('muk.frontend_url').'/penilaian/'.$p->id;
+    $harapan = config('muk.frontend_url').'/dashboard/penilaian/'.$p->id;
 
     expect((new JadwalAsesmenDitentukanNotifikasi($jadwal))->toMail($asesi)->actionUrl)->toBe($harapan)
         ->and((new JadwalAsesmenUntukAsesorNotifikasi($jadwal))->toMail($asesor)->actionUrl)->toBe($harapan);

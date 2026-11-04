@@ -24,17 +24,26 @@ class PendaftaranDitolakNotifikasi extends Notification implements ShouldQueue
         return (new MailMessage)
             ->subject('Pendaftaran Sertifikasi Anda Perlu Ditinjau Ulang')
             ->line('Mohon maaf, pendaftaran sertifikasi Anda belum dapat kami setujui.')
-            ->line('Alasan: ' . $this->pendaftaran->catatan_admin)
+            ->line('Alasan: '.$this->pendaftaran->catatan_admin)
             ->line('Anda dapat mengajukan pendaftaran baru setelah melengkapi dokumen yang diminta.');
     }
 
     public function toArray($notifiable): array
     {
+        // Format standar notifikasi asesi (lihat NotifikasiAsesiResource); "message" & "status" untuk kompatibilitas.
+        $skema = $this->pendaftaran->skemaSertifikasi?->title['id'] ?? null;
+        $pesan = 'Pendaftaran sertifikasi'.($skema ? " {$skema}" : '').' belum dapat disetujui. Alasan: '.$this->pendaftaran->catatan_admin;
+
         return [
-            'pendaftaran_id' => $this->pendaftaran->id,
+            'kategori' => 'pendaftaran',
+            'judul' => 'Pendaftaran ditolak',
+            'pesan' => $pesan,
+            'skema' => $skema,
             'kode_pendaftaran' => $this->pendaftaran->kode_pendaftaran,
+            'url' => null,
+            'pendaftaran_id' => $this->pendaftaran->id,
             'status' => 'rejected',
-            'message' => 'Pendaftaran Anda ditolak: ' . $this->pendaftaran->catatan_admin,
+            'message' => $pesan,
         ];
     }
 }

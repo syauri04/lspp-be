@@ -71,6 +71,13 @@ return [
         'ak-06' => Ak06Handler::class,
     ],
 
+    // Email notifikasi alur dokumen MUK.
+    'notifikasi' => [
+        // Email ke asesor saat asesi menyetujui dokumen yang diisi asesor (AK.07, AK.01, IA, AK.02, ...).
+        // Nonaktif: asesmen selalu tatap muka di kantor LSP, asesor melihat statusnya langsung di MUK.
+        'asesor_setelah_disetujui' => (bool) env('MUK_EMAIL_ASESOR_DISETUJUI', false),
+    ],
+
     // Zona waktu untuk tanggal pada dokumen (mis. tanggal tanda tangan penyusun/validator saat dikirim).
     'zona_waktu' => env('MUK_TIMEZONE', 'Asia/Jakarta'),
 

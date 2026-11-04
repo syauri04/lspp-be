@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Muk;
 
+use App\Models\Asesi;
 use App\Models\DokumenPenilaian;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -49,7 +50,8 @@ class DokumenPersetujuanNotifikasi extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        // Database hanya untuk asesi (halaman profil/notifikasi website).
+        return $notifiable instanceof Asesi ? ['mail', 'database'] : ['mail'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -58,7 +60,7 @@ class DokumenPersetujuanNotifikasi extends Notification implements ShouldQueue
         $kode = $d->jenisDokumen->kode;
         $nama = $d->jenisDokumen->nama;
         $skema = $d->penilaianMuk->pendaftaran->skemaSertifikasi->title['id'] ?? '-';
-        $url = config('muk.frontend_url').'/penilaian/'.$d->penilaian_muk_id.'/dokumen/'.$d->jenisDokumen->slug;
+        $url = $this->urlDokumen();
 
         $mail = (new MailMessage)
             ->greeting('Halo, '.($notifiable->name ?? $notifiable->nama ?? '').'!')
@@ -81,5 +83,35 @@ class DokumenPersetujuanNotifikasi extends Notification implements ShouldQueue
         };
 
         return $mail->action('Buka Dokumen', $url);
+    }
+
+    /** Format standar notifikasi asesi (NotifikasiAsesiResource). */
+    public function toArray(object $notifiable): array
+    {
+        $d = $this->dokumen->loadMissing(['jenisDokumen', 'penilaianMuk.pendaftaran.skemaSertifikasi']);
+        $kode = $d->jenisDokumen->kode;
+        $skema = $d->penilaianMuk->pendaftaran->skemaSertifikasi->title['id'] ?? null;
+        [$judul, $pesan] = match ($this->jenis) {
+            self::MINTA => ["{$kode} menunggu persetujuan Anda", "Asesor telah mengisi {$kode} {$d->jenisDokumen->nama}. Silakan baca dan setujui dengan tanda tangan Anda."],
+            self::JAWAB => ["{$kode} siap dijawab", "Asesor telah membuka {$kode} {$d->jenisDokumen->nama} untuk Anda jawab."],
+            self::DINILAI => ["{$kode} telah dinilai", "Asesor telah menilai jawaban {$kode} {$d->jenisDokumen->nama} Anda."],
+            default => ["{$kode} diperbarui", "{$kode} {$d->jenisDokumen->nama} diperbarui."],
+        };
+
+        return [
+            'kategori' => 'asesmen',
+            'judul' => $judul,
+            'pesan' => $pesan.($skema ? " Skema: {$skema}." : ''),
+            'skema' => $skema,
+            'kode_pendaftaran' => $d->penilaianMuk->pendaftaran->kode_pendaftaran,
+            'url' => $this->urlDokumen(),
+            'dokumen' => $kode,
+        ];
+    }
+
+    /** Tautan langsung ke dokumen di MUK. */
+    private function urlDokumen(): string
+    {
+        return config('muk.frontend_url').'/dashboard/penilaian/'.$this->dokumen->penilaian_muk_id.'/dokumen/'.$this->dokumen->jenisDokumen->slug;
     }
 }

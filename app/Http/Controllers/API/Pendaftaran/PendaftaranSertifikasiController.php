@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Pendaftaran;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pendaftaran\StorePendaftaranSertifikasiRequest;
+use App\Http\Resources\Profil\PendaftaranAsesiResource;
 use App\Models\Asesi;
 use App\Models\PendaftaranSertifikasi;
 use App\Models\SkemaSertifikasi;
@@ -11,8 +12,10 @@ use App\Models\User;
 use App\Notifications\PendaftaranMasukNotifikasi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class PendaftaranSertifikasiController extends Controller
 {
@@ -20,36 +23,54 @@ class PendaftaranSertifikasiController extends Controller
      * GET /api/pendaftaran-sertifikasi
      * List pendaftaran milik asesi yang sedang login (untuk halaman Profil).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): AnonymousResourceCollection
     {
         $asesi = $this->asesiAtauTolak($request);
+        $validated = $request->validate([
+            'kelompok' => ['nullable', Rule::in(array_keys(PendaftaranSertifikasi::KELOMPOK))],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
 
-        $pendaftaran = PendaftaranSertifikasi::with('skemaSertifikasi:id,title')
-            ->where('asesi_id', $asesi->id)
+        $query = PendaftaranSertifikasi::query()->where('asesi_id', $asesi->id);
+        // Jumlah per kelompok untuk badge tab filter (sebelum filter diterapkan).
+        $perStatus = (clone $query)->selectRaw('status, count(*) as jumlah')->groupBy('status')->pluck('jumlah', 'status');
+        $jumlah = collect(PendaftaranSertifikasi::KELOMPOK)
+            ->map(fn ($status) => (int) $perStatus->only($status)->sum());
+
+        if ($kelompok = $validated['kelompok'] ?? null) {
+            $query->whereIn('status', PendaftaranSertifikasi::KELOMPOK[$kelompok]);
+        }
+
+        $pendaftaran = $query->with(self::RELASI)
             ->latest()
-            ->paginate(10);
+            ->paginate($validated['per_page'] ?? 10)
+            ->withQueryString();
 
-        return response()->json($pendaftaran);
+        return PendaftaranAsesiResource::collection($pendaftaran)->additional(['meta' => ['jumlah' => $jumlah]]);
     }
 
     /**
      * GET /api/pendaftaran-sertifikasi/{kode_pendaftaran}
      * Detail + timeline status. Route model binding pakai kode_pendaftaran.
      */
-    public function show(Request $request, PendaftaranSertifikasi $pendaftaran): JsonResponse
+    public function show(Request $request, PendaftaranSertifikasi $pendaftaran): PendaftaranAsesiResource
     {
         $asesi = $this->asesiAtauTolak($request);
 
         abort_unless($pendaftaran->asesi_id === $asesi->id, 403, 'Anda tidak memiliki akses ke pendaftaran ini.');
 
-        $pendaftaran->load([
-            'skemaSertifikasi:id,title',
-            'riwayatStatus' => fn($q) => $q->orderBy('created_at'),
-            'pembayaran',
-        ]);
+        $pendaftaran->load([...self::RELASI, 'riwayatStatus', 'pembayaran']);
 
-        return response()->json($pendaftaran);
+        return (new PendaftaranAsesiResource($pendaftaran))->denganTimeline();
     }
+
+    /** Relasi untuk kartu profil (hindari N+1). */
+    private const RELASI = [
+        'skemaSertifikasi:id,title,slug,nomor_skema,image',
+        'jadwalAsesmen.tuk:id,title,city,address',
+        'jadwalAsesmen.asesor:id,nama',
+        'penilaianMuk:id,pendaftaran_sertifikasi_id,status,metode_asesmen,selesai_at',
+    ];
 
     /**
      * POST /api/pendaftaran-sertifikasi
@@ -97,12 +118,12 @@ class PendaftaranSertifikasiController extends Controller
 
         // Notifikasi ke seluruh admin (email + dashboard) lewat channel bawaan Laravel.
         User::role(['admin', 'super-admin'])->get()->each(
-            fn(User $admin) => $admin->notify(new PendaftaranMasukNotifikasi($pendaftaran))
+            fn (User $admin) => $admin->notify(new PendaftaranMasukNotifikasi($pendaftaran))
         );
 
         return response()->json([
             'message' => 'Terimakasih, Pengajuan sertifikasi Anda telah berhasil dikirim. '
-                . 'Anda dapat memantau status pengajuan melalui email dan halaman Profil Anda.',
+                .'Anda dapat memantau status pengajuan melalui email dan halaman Profil Anda.',
             'data' => [
                 'kode_pendaftaran' => $pendaftaran->kode_pendaftaran,
                 'status' => $pendaftaran->status,
