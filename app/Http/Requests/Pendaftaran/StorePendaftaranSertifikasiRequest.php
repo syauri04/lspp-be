@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Pendaftaran;
 
-use Illuminate\Foundation\Http\FormRequest;
 use App\Models\PendaftaranSertifikasi;
+use Illuminate\Foundation\Http\FormRequest;
 
 class StorePendaftaranSertifikasiRequest extends FormRequest
 {
@@ -14,29 +14,41 @@ class StorePendaftaranSertifikasiRequest extends FormRequest
         return true;
     }
 
+    /** Batas ukuran tiap dokumen pendaftaran (KB) = 25 MB. Samakan dengan MAKS_MB di lspp-fe (halaman daftar). */
+    public const MAKS_KB = 25600;
+
+    /** Dokumen wajib: field => [label, mimes]. */
+    public const DOKUMEN = [
+        'ktp' => ['KTP', 'pdf'],
+        'pas_foto' => ['Pas foto', 'jpg,jpeg,png'],
+        'ijazah' => ['Ijazah', 'pdf'],
+        'cv' => ['CV', 'pdf'],
+        'portfolio' => ['Portofolio', 'pdf'],
+    ];
+
     public function rules(): array
     {
         return [
             'skema_sertifikasi_id' => ['required', 'integer', 'exists:skema_sertifikasi,id'],
-
-            'ktp' => ['required', 'file', 'mimes:pdf', 'max:2048'],
-            'ijazah' => ['required', 'file', 'mimes:pdf', 'max:2048'],
-            'portfolio' => ['required', 'file', 'mimes:pdf', 'max:5120'],
-            'pas_foto' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:1024'],
-            'cv' => ['required', 'file', 'mimes:pdf', 'max:2048'],
+            ...collect(self::DOKUMEN)->mapWithKeys(fn ($d, $field) => [
+                $field => ['required', 'file', 'mimes:'.$d[1], 'max:'.self::MAKS_KB],
+            ])->all(),
         ];
     }
 
     public function messages(): array
     {
+        $maksMb = self::MAKS_KB / 1024;
+
+        // Pesan per file agar FE bisa menampilkan di field masing-masing.
         return [
             'skema_sertifikasi_id.exists' => 'Skema sertifikasi yang dipilih tidak ditemukan.',
-            'ktp.mimes' => 'KTP wajib berformat PDF.',
-            'ijazah.mimes' => 'Ijazah wajib berformat PDF.',
-            'portfolio.mimes' => 'Portfolio wajib berformat PDF.',
-            'pas_foto.mimes' => 'Pas foto wajib berformat JPG atau PNG.',
-            'cv.mimes' => 'CV wajib berformat PDF.',
-            '*.max' => 'Ukuran file terlalu besar.',
+            ...collect(self::DOKUMEN)->flatMap(fn ($d, $field) => [
+                "{$field}.required" => "{$d[0]} wajib diunggah.",
+                "{$field}.uploaded" => "{$d[0]} gagal diunggah. Pastikan ukurannya tidak lebih dari {$maksMb} MB.",
+                "{$field}.mimes" => "{$d[0]} wajib berformat ".($d[1] === 'pdf' ? 'PDF' : 'JPG atau PNG').'.',
+                "{$field}.max" => "Ukuran {$d[0]} maksimal {$maksMb} MB.",
+            ])->all(),
         ];
     }
 
