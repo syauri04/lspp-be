@@ -17,11 +17,13 @@ use App\Http\Controllers\CMS\MitraController;
 use App\Http\Controllers\CMS\NewsArticleController;
 use App\Http\Controllers\CMS\NewsCategoryController;
 use App\Http\Controllers\CMS\PendaftaranSertifikasiController;
+use App\Http\Controllers\CMS\PengaturanPembayaranController;
 use App\Http\Controllers\CMS\PenjadwalanAsesmenController;
 use App\Http\Controllers\CMS\ReviewApl01Controller;
 use App\Http\Controllers\CMS\SkemaSertifikasiController;
 use App\Http\Controllers\CMS\TinyMceController;
 use App\Http\Controllers\CMS\TUKController;
+use App\Http\Controllers\CMS\VerifikasiPembayaranController;
 use App\Http\Controllers\DokumenPendaftaranController;
 use Illuminate\Support\Facades\Route;
 
@@ -46,6 +48,26 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{dokumen}/bukti/{bukti}', [ReviewApl01Controller::class, 'bukti'])->whereNumber(['dokumen', 'bukti'])->name('bukti');
         Route::get('/{dokumen}/relevan/{relevan}', [ReviewApl01Controller::class, 'relevan'])->whereNumber(['dokumen', 'relevan'])->name('relevan');
         Route::get('/{dokumen}/tanda-tangan/{pihak}', [ReviewApl01Controller::class, 'tandaTangan'])->whereNumber('dokumen')->name('tanda-tangan');
+    });
+
+    // Verifikasi bukti transfer manual
+    Route::prefix('verifikasi-pembayaran')->name('verifikasi-pembayaran.')->group(function () {
+        Route::get('/', [VerifikasiPembayaranController::class, 'index'])->name('index');
+        Route::get('/{bukti}', [VerifikasiPembayaranController::class, 'show'])->whereNumber('bukti')->name('show');
+        Route::post('/{bukti}/setujui', [VerifikasiPembayaranController::class, 'setujui'])->whereNumber('bukti')->name('setujui');
+        Route::post('/{bukti}/tolak', [VerifikasiPembayaranController::class, 'tolak'])->whereNumber('bukti')->name('tolak');
+        Route::get('/{bukti}/berkas', [VerifikasiPembayaranController::class, 'berkas'])->whereNumber('bukti')->name('berkas');
+    });
+
+    // Pengaturan pembayaran: metode (DOKU / transfer manual) & rekening LSP
+    Route::prefix('pengaturan-pembayaran')->name('pengaturan-pembayaran.')->group(function () {
+        Route::get('/', [PengaturanPembayaranController::class, 'index'])->name('index');
+        Route::put('/metode', [PengaturanPembayaranController::class, 'simpanMetode'])->name('metode');
+        Route::get('/rekening/create', [PengaturanPembayaranController::class, 'create'])->name('rekening.create');
+        Route::post('/rekening', [PengaturanPembayaranController::class, 'store'])->name('rekening.store');
+        Route::get('/rekening/{rekening}/edit', [PengaturanPembayaranController::class, 'edit'])->whereNumber('rekening')->name('rekening.edit');
+        Route::put('/rekening/{rekening}', [PengaturanPembayaranController::class, 'update'])->whereNumber('rekening')->name('rekening.update');
+        Route::delete('/rekening/{rekening}', [PengaturanPembayaranController::class, 'destroy'])->whereNumber('rekening')->name('rekening.destroy');
     });
 
     // Asesmen

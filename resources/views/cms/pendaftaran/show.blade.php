@@ -220,8 +220,34 @@
                                                     </td>
                                                 </tr>
                                             @endif
+                                            @if ($pendaftaran->pembayaran->metode_pembayaran)
+                                                <tr>
+                                                    <th>Metode</th>
+                                                    <td>{{ $pendaftaran->pembayaran->metode_pembayaran }}</td>
+                                                </tr>
+                                            @endif
                                         </tbody>
                                     </table>
+
+                                    @if ($pendaftaran->pembayaran->buktiPembayaran->isNotEmpty())
+                                        <h6 class="mt-3">Bukti Transfer Manual</h6>
+                                        <ul class="list-unstyled mb-0">
+                                            @foreach ($pendaftaran->pembayaran->buktiPembayaran as $bukti)
+                                                <li class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                                    <span class="small">
+                                                        {{ $bukti->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }}
+                                                        &middot; Rp {{ number_format($bukti->jumlah_transfer, 0, ',', '.') }}
+                                                        <span class="badge {{ ['menunggu' => 'bg-warning text-dark', 'disetujui' => 'bg-success', 'ditolak' => 'bg-danger'][$bukti->status] ?? 'bg-secondary' }}">
+                                                            {{ \App\Models\BuktiPembayaran::STATUS_LABEL[$bukti->status] ?? $bukti->status }}
+                                                        </span>
+                                                    </span>
+                                                    <a href="{{ route('verifikasi-pembayaran.show', $bukti) }}" class="btn btn-sm btn-light">
+                                                        {{ $bukti->status === 'menunggu' ? 'Verifikasi' : 'Lihat' }}
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
                                 </div>
                             </div>
                         @endif

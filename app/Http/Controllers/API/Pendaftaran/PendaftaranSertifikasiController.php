@@ -70,6 +70,7 @@ class PendaftaranSertifikasiController extends Controller
         'jadwalAsesmen.tuk:id,title,city,address',
         'jadwalAsesmen.asesor:id,nama',
         'penilaianMuk:id,pendaftaran_sertifikasi_id,status,metode_asesmen,selesai_at',
+        'pembayaran.buktiMenunggu',
     ];
 
     /**

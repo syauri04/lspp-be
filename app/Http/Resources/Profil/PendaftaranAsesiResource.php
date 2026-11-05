@@ -38,7 +38,9 @@ class PendaftaranAsesiResource extends JsonResource
         return [
             'kode_pendaftaran' => $this->kode_pendaftaran,
             'status' => $this->status,
-            'status_label' => PendaftaranSertifikasi::STATUS_LABEL[$this->status] ?? $this->status,
+            'status_label' => $this->menungguVerifikasi()
+                ? 'Menunggu verifikasi pembayaran'
+                : (PendaftaranSertifikasi::STATUS_LABEL[$this->status] ?? $this->status),
             'kelompok' => PendaftaranSertifikasi::kelompokDari($this->status),
             'catatan_admin' => $this->status === 'rejected' ? $this->catatan_admin : null,
             'diajukan_at' => ($this->submitted_at ?? $this->created_at)?->toIso8601String(),
@@ -85,13 +87,23 @@ class PendaftaranAsesiResource extends JsonResource
     private function aksi(?PenilaianMuk $penilaian): ?array
     {
         if (in_array($this->status, ['approved', 'awaiting_payment'], true)) {
-            return ['jenis' => 'bayar', 'url' => '/checkout/'.$this->kode_pendaftaran];
+            // Bukti transfer manual sedang diverifikasi admin: arahkan ke halaman status, bukan bayar lagi.
+            return [
+                'jenis' => $this->menungguVerifikasi() ? 'cek_pembayaran' : 'bayar',
+                'url' => '/checkout/'.$this->kode_pendaftaran,
+            ];
         }
         if ($this->status === 'dijadwalkan' && $penilaian) {
             return ['jenis' => 'mulai_asesmen', 'url' => config('muk.frontend_url').'/dashboard/penilaian/'.$penilaian->id];
         }
 
         return null;
+    }
+
+    /** Menunggu pembayaran dan bukti transfer manual sedang diverifikasi admin. */
+    private function menungguVerifikasi(): bool
+    {
+        return $this->status === 'awaiting_payment' && $this->pembayaran?->buktiMenunggu !== null;
     }
 
     /**

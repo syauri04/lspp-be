@@ -344,7 +344,7 @@ Route::middleware(['auth:sanctum', 'asesi.website', 'throttle:60,1'])
 | 'snap-token' baru manggil Midtrans, hanya dipanggil saat asesi klik "Bayar Sekarang".
 */
 
-Route::middleware(['auth:sanctum', 'throttle:60,1'])
+Route::middleware(['auth:sanctum', 'asesi.website', 'throttle:60,1'])
     ->prefix('checkout')
     ->group(function () {
 
@@ -356,7 +356,13 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])
         Route::post('/{pendaftaran:kode_pendaftaran}/pay', [
             CheckoutController::class,
             'pay',
-        ])->middleware('throttle:20,1');
+        ])->middleware('throttle:20,1,checkout-pay'); // prefix: penghitung terpisah dari throttle grup
+
+        // Transfer manual: unggah bukti (diverifikasi admin di CMS).
+        Route::post('/{pendaftaran:kode_pendaftaran}/bukti-transfer', [
+            CheckoutController::class,
+            'kirimBuktiTransfer',
+        ])->middleware('throttle:5,1,bukti-transfer'); // prefix: penghitung terpisah dari throttle grup
 
         // Route::post('/{pendaftaran:kode_pendaftaran}/snap-token', [
         //     CheckoutController::class,

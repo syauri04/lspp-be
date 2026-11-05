@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pembayaran extends Model
 {
@@ -30,5 +32,17 @@ class Pembayaran extends Model
     public function pendaftaranSertifikasi(): BelongsTo
     {
         return $this->belongsTo(PendaftaranSertifikasi::class, 'pendaftaran_sertifikasi_id');
+    }
+
+    /** Bukti transfer manual (terbaru dulu). */
+    public function buktiPembayaran(): HasMany
+    {
+        return $this->hasMany(BuktiPembayaran::class)->latest('id');
+    }
+
+    /** Bukti transfer yang sedang menunggu verifikasi admin (maksimal satu). */
+    public function buktiMenunggu(): HasOne
+    {
+        return $this->hasOne(BuktiPembayaran::class)->where('status', BuktiPembayaran::MENUNGGU)->latest('id');
     }
 }

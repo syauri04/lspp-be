@@ -4,8 +4,8 @@ namespace App\Http\Controllers\CMS;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pendaftaran\ReviewPendaftaranRequest;
-use App\Models\PendaftaranSertifikasi;
 use App\Models\Pembayaran;
+use App\Models\PendaftaranSertifikasi;
 use App\Notifications\PendaftaranDisetujuiNotifikasi;
 use App\Notifications\PendaftaranDitolakNotifikasi;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +18,7 @@ class PendaftaranSertifikasiController extends Controller
     public function index(Request $request): View
     {
         $pendaftaran = PendaftaranSertifikasi::with(['asesi:id,name', 'skemaSertifikasi:id,title'])
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->latest()
             ->paginate(20);
 
@@ -32,7 +32,7 @@ class PendaftaranSertifikasiController extends Controller
             'riwayatStatus.changedBy:id,name',
             'asesi',
             'skemaSertifikasi',
-            'pembayaran',
+            'pembayaran.buktiPembayaran',
         ]);
 
         return view('cms.pendaftaran.show', compact('pendaftaran'));
@@ -65,7 +65,7 @@ class PendaftaranSertifikasiController extends Controller
             ]);
 
             Pembayaran::create([
-                'kode_transaksi' => 'LSPP-' . strtoupper(substr($pendaftaran->kode_pendaftaran, 0, 8)) . '-' . now()->timestamp,
+                'kode_transaksi' => 'LSPP-'.strtoupper(substr($pendaftaran->kode_pendaftaran, 0, 8)).'-'.now()->timestamp,
                 'pendaftaran_sertifikasi_id' => $pendaftaran->id,
                 'jumlah' => $pendaftaran->harga_snapshot,
                 'status' => 'pending',

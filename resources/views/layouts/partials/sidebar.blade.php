@@ -35,6 +35,19 @@
                 </li>
 
                 <li>
+                    @php
+                        $buktiMenunggu = \App\Models\BuktiPembayaran::where('status', \App\Models\BuktiPembayaran::MENUNGGU)->count();
+                    @endphp
+                    <a href="{{ route('verifikasi-pembayaran.index') }}" class="waves-effect">
+                        <i class="dripicons-wallet"></i>
+                        @if ($buktiMenunggu)
+                            <span class="badge rounded-pill bg-warning text-dark float-end">{{ $buktiMenunggu }}</span>
+                        @endif
+                        <span>Verifikasi Pembayaran</span>
+                    </a>
+                </li>
+
+                <li>
                     <a href="{{ route('penjadwalan-asesmen.index') }}" class="waves-effect">
                         <i class="dripicons-calendar"></i>
                         <span>Penjadwalan Asesmen</span>
@@ -52,6 +65,13 @@
                     <a href="{{ route('review-apl01.index') }}" class="waves-effect">
                         <i class="dripicons-document-edit"></i>
                         <span>Review FR.APL.01</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ route('pengaturan-pembayaran.index') }}" class="waves-effect">
+                        <i class="dripicons-gear"></i>
+                        <span>Pengaturan Pembayaran</span>
                     </a>
                 </li>
 

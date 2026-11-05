@@ -4,8 +4,12 @@ namespace App\Http\Controllers\API\Pendaftaran;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asesi;
+use App\Models\BuktiPembayaran;
 use App\Models\Pembayaran;
 use App\Models\PendaftaranSertifikasi;
+use App\Models\Pengaturan;
+use App\Models\RekeningPembayaran;
+use App\Services\Pembayaran\PembayaranManual;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
 {
@@ -40,13 +45,20 @@ class CheckoutController extends Controller
             'Tagihan pembayaran tidak ditemukan atau sudah tidak berlaku.'
         );
 
-        if ($pembayaran->expired_at && now()->greaterThanOrEqualTo($pembayaran->expired_at)) {
+        // Bukti transfer yang sedang diverifikasi admin tidak boleh hangus karena batas waktu.
+        if ($pembayaran->expired_at && now()->greaterThanOrEqualTo($pembayaran->expired_at) && ! $pembayaran->buktiMenunggu) {
             $this->kedaluwarsakan($pendaftaran, $pembayaran);
 
             abort(410, 'Batas waktu pembayaran untuk pendaftaran ini sudah lewat.');
         }
 
         $pendaftaran->load('skemaSertifikasi:id,title,image');
+        // Transfer manual hanya ditawarkan bila diaktifkan DAN ada rekening aktif.
+        $rekening = Pengaturan::aktif(Pengaturan::PEMBAYARAN_MANUAL_AKTIF)
+            ? RekeningPembayaran::query()->aktif()->get(['id', 'nama_bank', 'nomor_rekening', 'atas_nama', 'keterangan'])
+            : collect();
+        $manualAktif = $rekening->isNotEmpty();
+        $buktiTerakhir = $pembayaran->buktiPembayaran()->with('rekening')->first();
 
         return response()->json([
             'data' => [
@@ -59,8 +71,70 @@ class CheckoutController extends Controller
                 // (kalau sudah pernah di-generate) bisa langsung dipakai lagi tanpa panggil
                 // DOKU sekali lagi -- lihat gateway_payload yang disimpan waktu pay() dipanggil.
                 'payment_url' => data_get($pembayaran->gateway_payload, 'response.payment.url'),
+                // Metode yang tersedia (saklar di CMS: Pengaturan Pembayaran).
+                'metode' => [
+                    'doku' => Pengaturan::aktif(Pengaturan::PEMBAYARAN_DOKU_AKTIF),
+                    'manual' => $manualAktif,
+                ],
+                'rekening' => $rekening,
+                'bukti_terakhir' => $buktiTerakhir ? $this->buktiRingkas($buktiTerakhir) : null,
+                'unggah' => ['mimes' => BuktiPembayaran::MIMES, 'maks_kb' => BuktiPembayaran::MAKS_KB],
             ],
         ]);
+    }
+
+    /**
+     * POST /api/checkout/{kode_pendaftaran}/bukti-transfer  (multipart)
+     * Asesi mengunggah bukti transfer manual; admin memverifikasi di CMS (Verifikasi Pembayaran).
+     */
+    public function kirimBuktiTransfer(Request $request, PendaftaranSertifikasi $pendaftaran, PembayaranManual $manual): JsonResponse
+    {
+        $this->asesiAtauTolak($request, $pendaftaran);
+
+        $data = $request->validate([
+            'rekening_pembayaran_id' => ['required', 'integer', Rule::exists('rekening_pembayarans', 'id')->where('aktif', true)],
+            'nama_pengirim' => ['required', 'string', 'max:150'],
+            'bank_pengirim' => ['required', 'string', 'max:100'],
+            // Tidak boleh di masa depan (tanggal WIB); batas bawah = tanggal tagihan dibuat (pendaftaran disetujui).
+            'tanggal_transfer' => [
+                'required', 'date_format:Y-m-d',
+                'before_or_equal:'.now(config('muk.zona_waktu'))->toDateString(),
+                'after_or_equal:'.($pendaftaran->pembayaran?->created_at?->timezone(config('muk.zona_waktu'))->toDateString() ?? '2000-01-01'),
+            ],
+            'jumlah_transfer' => ['required', 'numeric', 'min:1', 'max:9999999999'],
+            'catatan' => ['nullable', 'string', 'max:500'],
+            'file' => ['required', 'file', 'mimes:'.implode(',', BuktiPembayaran::MIMES), 'max:'.BuktiPembayaran::MAKS_KB],
+        ], [
+            'rekening_pembayaran_id.exists' => 'Pilih rekening tujuan yang tersedia.',
+            'tanggal_transfer.before_or_equal' => 'Tanggal transfer tidak boleh di masa depan.',
+            'tanggal_transfer.after_or_equal' => 'Tanggal transfer tidak boleh sebelum pendaftaran disetujui.',
+            'file.mimes' => 'Bukti transfer harus berformat JPG, PNG, atau PDF.',
+            'file.max' => 'Ukuran bukti transfer maksimal 5 MB.',
+        ]);
+
+        $bukti = $manual->kirimBukti($pendaftaran, $data, $request->file('file'));
+
+        return response()->json([
+            'message' => 'Bukti transfer berhasil dikirim dan akan diverifikasi admin LSP.',
+            'data' => $this->buktiRingkas($bukti->load('rekening')),
+        ], 201);
+    }
+
+    /** Ringkasan bukti transfer untuk asesi (tanpa path berkas). */
+    private function buktiRingkas(BuktiPembayaran $bukti): array
+    {
+        return [
+            'id' => $bukti->id,
+            'status' => $bukti->status,
+            'status_label' => BuktiPembayaran::STATUS_LABEL[$bukti->status] ?? $bukti->status,
+            'catatan_admin' => $bukti->catatan_admin,
+            'rekening_tujuan' => $bukti->rekening_tujuan,
+            'nama_pengirim' => $bukti->nama_pengirim,
+            'bank_pengirim' => $bukti->bank_pengirim,
+            'tanggal_transfer' => $bukti->tanggal_transfer?->toDateString(),
+            'jumlah_transfer' => $bukti->jumlah_transfer,
+            'dikirim_at' => $bukti->created_at?->toIso8601String(),
+        ];
     }
 
     /**
@@ -77,6 +151,18 @@ class CheckoutController extends Controller
 
         $pembayaran = $pendaftaran->pembayaran;
         abort_if(! $pembayaran || $pembayaran->status !== 'pending', 404);
+
+        abort_unless(
+            Pengaturan::aktif(Pengaturan::PEMBAYARAN_DOKU_AKTIF),
+            409,
+            'Pembayaran online sedang tidak tersedia. Silakan gunakan transfer manual.'
+        );
+        // Cegah pembayaran ganda: bukti transfer manual masih diverifikasi admin.
+        abort_if(
+            $pembayaran->buktiMenunggu()->exists(),
+            409,
+            'Bukti transfer Anda sedang diverifikasi admin. Tunggu hasil verifikasi sebelum membayar dengan metode lain.'
+        );
 
         if ($pembayaran->expired_at && now()->greaterThanOrEqualTo($pembayaran->expired_at)) {
             $this->kedaluwarsakan($pendaftaran, $pembayaran);
