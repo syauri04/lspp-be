@@ -18,6 +18,8 @@ use App\Http\Controllers\CMS\NewsArticleController;
 use App\Http\Controllers\CMS\NewsCategoryController;
 use App\Http\Controllers\CMS\PendaftaranSertifikasiController;
 use App\Http\Controllers\CMS\PengaturanPembayaranController;
+use App\Http\Controllers\CMS\NotifikasiController;
+use App\Http\Controllers\CMS\VoucherController;
 use App\Http\Controllers\CMS\PenjadwalanAsesmenController;
 use App\Http\Controllers\CMS\ReviewApl01Controller;
 use App\Http\Controllers\CMS\SkemaSertifikasiController;
@@ -70,6 +72,16 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/rekening/{rekening}', [PengaturanPembayaranController::class, 'destroy'])->whereNumber('rekening')->name('rekening.destroy');
     });
 
+    // Notifikasi lonceng CMS (milik admin yang login)
+    Route::prefix('notifikasi-admin')->name('notifikasi-admin.')->group(function () {
+        Route::get('/', [NotifikasiController::class, 'index'])->name('index');
+        Route::post('/baca-semua', [NotifikasiController::class, 'bacaSemua'])->name('baca-semua');
+        Route::get('/{id}', [NotifikasiController::class, 'buka'])->whereUuid('id')->name('buka');
+    });
+
+    // Voucher potongan biaya sertifikasi (dipakai asesi di checkout)
+    Route::resource('vouchers', VoucherController::class);
+
     // Asesmen
     Route::prefix('asesmen')->name('asesmen.')->group(function () {
         Route::get('/', [AsesmenController::class, 'index'])->name('index');
@@ -91,6 +103,9 @@ Route::middleware(['auth'])->group(function () {
 
             Route::post('/{pendaftaran:kode_pendaftaran}/reject', [PendaftaranSertifikasiController::class, 'reject'])
                 ->name('reject');
+
+            Route::post('/{pendaftaran:kode_pendaftaran}/reset-sesi-pembayaran', [PendaftaranSertifikasiController::class, 'resetSesiPembayaran'])
+                ->name('reset-sesi-pembayaran');
         });
 
     // view Dokumen
@@ -195,6 +210,8 @@ Route::middleware(['auth'])->group(function () {
     );
 
     // Asesi
+    Route::patch('asesis/{asesi}/nonaktifkan', [AsesiController::class, 'nonaktifkan'])->name('asesis.nonaktifkan');
+    Route::patch('asesis/{asesi}/aktifkan', [AsesiController::class, 'aktifkan'])->name('asesis.aktifkan');
     Route::resource('asesis', AsesiController::class);
     // Asesor
     Route::resource('asesors', AsesorController::class);

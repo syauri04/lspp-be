@@ -4,14 +4,30 @@ namespace App\Http\Requests\Pendaftaran;
 
 use App\Models\PendaftaranSertifikasi;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StorePendaftaranSertifikasiRequest extends FormRequest
 {
+    /** Kode di respons 403 agar lspp-fe bisa mengarahkan asesi ke halaman buat password. */
+    public const KODE_PASSWORD_BELUM_DIATUR = 'password_belum_diatur';
+
+    /**
+     * Login sudah dicek middleware di route. Asesi yang mendaftar via Google wajib
+     * membuat password dulu, karena password itu dipakai untuk login di MUK (asesmen).
+     * Dicek sebelum validasi berkas, jadi dokumen tidak diproses sia-sia.
+     */
     public function authorize(): bool
     {
-        // Otorisasi login sudah ditangani middleware 'auth:asesi' di route,
-        // di sini cukup pastikan asesi belum punya pendaftaran aktif untuk skema yang sama.
-        return true;
+        return $this->user()?->password !== null;
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new HttpResponseException(response()->json([
+            'message' => 'Silakan buat password terlebih dahulu di halaman Profil. '
+                .'Password ini digunakan untuk login ke aplikasi MUK saat asesmen.',
+            'kode' => self::KODE_PASSWORD_BELUM_DIATUR,
+        ], 403));
     }
 
     /** Batas ukuran tiap dokumen pendaftaran (KB) = 25 MB. Samakan dengan MAKS_MB di lspp-fe (halaman daftar). */

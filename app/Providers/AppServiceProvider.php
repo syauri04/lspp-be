@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Support\Cms\HitungMenu;
+use App\Support\Cms\NotifikasiAdmin;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,5 +38,17 @@ class AppServiceProvider extends ServiceProvider
         // Tanda tangan & submit, per user.
         RateLimiter::for('muk-aksi', fn (Request $request) => Limit::perMinute(20)
             ->by('muk-aksi|'.$request->user()?->getMorphClass().'|'.$request->user()?->getKey()));
+
+        // CMS: lonceng notifikasi (milik admin yang login) & badge jumlah pekerjaan di sidebar.
+        View::composer('layouts.partials.topbar', function ($view) {
+            $admin = auth('web')->user();
+            $view->with([
+                'notifBelumDibaca' => $admin ? $admin->unreadNotifications()->count() : 0,
+                'notifTerbaru' => $admin
+                    ? $admin->notifications()->latest()->limit(8)->get()->map(fn ($n) => NotifikasiAdmin::tampil($n))
+                    : collect(),
+            ]);
+        });
+        View::composer('layouts.partials.sidebar', fn ($view) => $view->with('hitungMenu', HitungMenu::semua()));
     }
 }

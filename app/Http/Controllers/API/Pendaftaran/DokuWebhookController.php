@@ -38,7 +38,20 @@ class DokuWebhookController extends Controller
 
         $invoiceNumber = $payload['order']['invoice_number'] ?? null;
         $pembayaran = Pembayaran::where('kode_transaksi', $invoiceNumber)->first();
+
+        // Invoice dari sesi DOKU yang sudah direset admin (link lama masih bisa dibayar di DOKU).
+        $dariSesiLama = false;
+        if (! $pembayaran && is_string($invoiceNumber) && $invoiceNumber !== '') {
+            $pembayaran = Pembayaran::whereJsonContains('sesi_doku_lama', ['kode_transaksi' => $invoiceNumber])->first();
+            $dariSesiLama = $pembayaran !== null;
+        }
         abort_unless($pembayaran, 404, 'Transaksi tidak ditemukan');
+
+        // Dari sesi lama hanya pembayaran SUKSES yang diproses; expired/pending sesi lama tidak boleh
+        // mengubah tagihan yang sekarang memakai sesi baru.
+        if ($dariSesiLama && $this->mapStatus(strtoupper($payload['transaction']['status'] ?? '')) !== 'paid') {
+            return response()->json(['message' => 'Notifikasi sesi lama (sudah direset) diabaikan']);
+        }
 
         // DOKU punya status di level ORDER (order.status: ORDER_GENERATED / ORDER_EXPIRED /
         // ORDER_RECOVERED), terpisah dari status per-percobaan channel (transaction.status).
@@ -95,10 +108,24 @@ class DokuWebhookController extends Controller
         }
 
         if ($statusBaru === 'paid') {
+            // Pengaman: nominal yang dibayar di DOKU tidak boleh kurang dari tagihan (mis. setelah potongan
+            // voucher berubah). Tidak dinyatakan lunas otomatis -- admin mengecek manual.
+            $dibayar = data_get($payload, 'order.amount');
+            if ($dibayar !== null && (int) round((float) $dibayar) < (int) round((float) $pembayaran->jumlah)) {
+                Log::critical('DOKU webhook: nominal dibayar kurang dari tagihan, tidak dinyatakan lunas', [
+                    'kode_transaksi' => $invoiceNumber,
+                    'dibayar' => $dibayar,
+                    'tagihan' => $pembayaran->jumlah,
+                ]);
+
+                return response()->json(['message' => 'Nominal tidak sesuai tagihan, perlu pengecekan manual']);
+            }
+
             // Lunas: pembayaran + pendaftaran + riwayat (memicu notifikasi ke asesi) dalam satu transaksi.
             app(KonfirmasiPembayaran::class)->lunas(
                 $pembayaran,
-                'Pembayaran dikonfirmasi otomatis via webhook DOKU (channel: '.($payload['channel']['id'] ?? '-').').',
+                'Pembayaran dikonfirmasi otomatis via webhook DOKU (channel: '.($payload['channel']['id'] ?? '-').')'
+                    .($dariSesiLama ? " melalui sesi lama {$invoiceNumber}." : '.'),
                 $payload['channel']['id'] ?? null,
                 $payload['transaction']['original_request_id'] ?? null,
                 $payload,

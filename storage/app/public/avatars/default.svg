@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Avatar pengguna">
+  <defs>
+    <linearGradient id="latar" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EEF6E0"/>
+      <stop offset="1" stop-color="#D6EBB3"/>
+    </linearGradient>
+    <linearGradient id="badan" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8CC63F"/>
+      <stop offset="1" stop-color="#6FA22B"/>
+    </linearGradient>
+    <clipPath id="lingkaran">
+      <circle cx="128" cy="128" r="128"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#lingkaran)">
+    <rect width="256" height="256" fill="url(#latar)"/>
+    <!-- badan / bahu -->
+    <path d="M28 256c0-58 44.8-100 100-100s100 42 100 100z" fill="url(#badan)"/>
+    <!-- leher -->
+    <path d="M108 140h40v22c0 11-9 20-20 20s-20-9-20-20z" fill="#F2C9A0"/>
+    <!-- kepala -->
+    <circle cx="128" cy="100" r="44" fill="#F7D6B3"/>
+    <!-- rambut -->
+    <path d="M84 98c0-27 19.7-46 44-46s44 19 44 46c-6-12-17-20-30-22-9 9-26 14-46 14-5 0-9 3-12 8z" fill="#3F4A3C"/>
+    <!-- kerah -->
+    <path d="M104 166l24 22 24-22 14 8-38 26-38-26z" fill="#FFFFFF" opacity=".9"/>
+  </g>
+</svg>

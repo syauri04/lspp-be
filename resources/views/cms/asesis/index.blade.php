@@ -103,26 +103,74 @@
                                                         {{ $stat ?? '-' }}
                                                     </span>
 
+                                                    @if ($p->nonaktif())
+                                                        <span class="badge bg-danger"
+                                                            title="Dinonaktifkan {{ $p->nonaktif_at->timezone('Asia/Jakarta')->format('d/m/Y H:i') }}">
+                                                            Nonaktif
+                                                        </span>
+                                                    @endif
+
+                                                    @if ($p->pendaftaran_sertifikasi_count > 0)
+                                                        <span class="badge bg-info">
+                                                            {{ $p->pendaftaran_sertifikasi_count }} pendaftaran
+                                                        </span>
+                                                    @endif
                                                 </td>
 
                                                 <td class="text-center">
                                                     <div class="d-inline-flex gap-1">
-                                                        {{-- EDIT --}}
+                                                        {{-- EDIT: disembunyikan sementara (AsesiController@edit belum diimplementasikan) --}}
+                                                        {{--
                                                         <a href="{{ route('asesis.edit', $p->id) }}"
                                                             class="btn btn-outline-secondary btn-sm" title="Edit">
                                                             <i class="fas fa-pencil-alt"></i>
                                                         </a>
+                                                        --}}
 
-                                                        {{-- DELETE --}}
-                                                        <form action="{{ route('asesis.destroy', $p->id) }}" method="POST"
-                                                            class="d-inline" onsubmit="return confirmDelete()">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="btn btn-outline-danger btn-sm"
-                                                                title="Hapus">
-                                                                <i class="fas fa-trash-alt"></i>
-                                                            </button>
-                                                        </form>
+                                                        {{-- NONAKTIFKAN / AKTIFKAN --}}
+                                                        @if ($p->nonaktif())
+                                                            <form action="{{ route('asesis.aktifkan', $p->id) }}" method="POST"
+                                                                class="d-inline"
+                                                                onsubmit="return confirm('Aktifkan kembali akun asesi ini?')">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <button type="submit" class="btn btn-outline-success btn-sm"
+                                                                    title="Aktifkan">
+                                                                    <i class="fas fa-user-check"></i>
+                                                                </button>
+                                                            </form>
+                                                        @else
+                                                            <form action="{{ route('asesis.nonaktifkan', $p->id) }}" method="POST"
+                                                                class="d-inline"
+                                                                onsubmit="return confirm('Nonaktifkan akun asesi ini?\n\nAsesi tidak dapat login ke website maupun MUK dan semua sesi login akan diakhiri. Data pendaftaran & asesmen tetap tersimpan.')">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <button type="submit" class="btn btn-outline-warning btn-sm"
+                                                                    title="Nonaktifkan">
+                                                                    <i class="fas fa-user-slash"></i>
+                                                                </button>
+                                                            </form>
+                                                        @endif
+
+                                                        {{-- DELETE: hanya untuk asesi yang belum pernah mendaftar --}}
+                                                        @if ($p->pendaftaran_sertifikasi_count === 0)
+                                                            <form action="{{ route('asesis.destroy', $p->id) }}" method="POST"
+                                                                class="d-inline" onsubmit="return confirmDelete()">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                                    title="Hapus">
+                                                                    <i class="fas fa-trash-alt"></i>
+                                                                </button>
+                                                            </form>
+                                                        @else
+                                                            <span class="d-inline-block" tabindex="0"
+                                                                title="Tidak dapat dihapus: asesi memiliki {{ $p->pendaftaran_sertifikasi_count }} pendaftaran. Gunakan Nonaktifkan.">
+                                                                <button type="button" class="btn btn-outline-danger btn-sm" disabled>
+                                                                    <i class="fas fa-trash-alt"></i>
+                                                                </button>
+                                                            </span>
+                                                        @endif
                                                     </div>
                                                 </td>
 

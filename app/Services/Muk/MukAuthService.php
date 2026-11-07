@@ -35,6 +35,10 @@ class MukAuthService
             $this->gagal($kunci, self::PESAN_GAGAL.' Jika Anda mendaftar dengan Google, buat kata sandi terlebih dahulu di website LSPP 306.');
         }
 
+        if ($asesi->nonaktif()) {
+            $this->gagal($kunci, Asesi::PESAN_NONAKTIF);
+        }
+
         if (! $asesi->hasVerifiedEmail()) {
             $this->gagal($kunci, 'Email belum diverifikasi. Silakan cek email Anda.');
         }

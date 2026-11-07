@@ -20,6 +20,12 @@ class LoginController extends Controller
             ]);
         }
 
+        if ($asesi->nonaktif()) {
+            throw ValidationException::withMessages([
+                'email' => [Asesi::PESAN_NONAKTIF],
+            ]);
+        }
+
         if (! $asesi->hasVerifiedEmail()) {
             throw ValidationException::withMessages([
                 'email' => ['Email belum diverifikasi. Silakan cek email Anda.'],

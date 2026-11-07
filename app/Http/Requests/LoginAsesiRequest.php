@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\CaptchaValid;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LoginAsesiRequest extends FormRequest
@@ -16,6 +17,7 @@ class LoginAsesiRequest extends FormRequest
         return [
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            ...CaptchaValid::aturan($this->input('captcha_id')),
         ];
     }
 }

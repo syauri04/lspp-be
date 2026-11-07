@@ -175,6 +175,16 @@
                                             <th>Jumlah Tagihan</th>
                                             <td><strong>Rp {{ number_format($pembayaran->jumlah, 0, ',', '.') }}</strong></td>
                                         </tr>
+                                        @if ($pembayaran->voucher_kode)
+                                            <tr>
+                                                <th>Voucher</th>
+                                                <td>
+                                                    <span class="font-monospace">{{ $pembayaran->voucher_kode }}</span>:
+                                                    harga Rp {{ number_format($pembayaran->hargaAwal(), 0, ',', '.') }}
+                                                    − potongan Rp {{ number_format($pembayaran->potongan, 0, ',', '.') }}
+                                                </td>
+                                            </tr>
+                                        @endif
                                         <tr>
                                             <th>Status Tagihan</th>
                                             <td>{{ ucwords($pembayaran->status) }}</td>

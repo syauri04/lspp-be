@@ -30,18 +30,18 @@
                 <li>
                     <a href="{{ route('pendaftaran.index') }}" class="waves-effect">
                         <i class="dripicons-checklist"></i>
+                        @if ($hitungMenu['pendaftaran'] ?? 0)
+                            <span class="badge rounded-pill bg-danger float-end" title="Pendaftaran perlu direview">{{ $hitungMenu['pendaftaran'] > 99 ? '99+' : $hitungMenu['pendaftaran'] }}</span>
+                        @endif
                         <span>Pendaftaran Sertifikasi</span>
                     </a>
                 </li>
 
                 <li>
-                    @php
-                        $buktiMenunggu = \App\Models\BuktiPembayaran::where('status', \App\Models\BuktiPembayaran::MENUNGGU)->count();
-                    @endphp
                     <a href="{{ route('verifikasi-pembayaran.index') }}" class="waves-effect">
                         <i class="dripicons-wallet"></i>
-                        @if ($buktiMenunggu)
-                            <span class="badge rounded-pill bg-warning text-dark float-end">{{ $buktiMenunggu }}</span>
+                        @if ($hitungMenu['verifikasi_pembayaran'] ?? 0)
+                            <span class="badge rounded-pill bg-warning text-dark float-end" title="Bukti transfer menunggu verifikasi">{{ $hitungMenu['verifikasi_pembayaran'] > 99 ? '99+' : $hitungMenu['verifikasi_pembayaran'] }}</span>
                         @endif
                         <span>Verifikasi Pembayaran</span>
                     </a>
@@ -50,6 +50,9 @@
                 <li>
                     <a href="{{ route('penjadwalan-asesmen.index') }}" class="waves-effect">
                         <i class="dripicons-calendar"></i>
+                        @if ($hitungMenu['penjadwalan'] ?? 0)
+                            <span class="badge rounded-pill bg-info float-end" title="Sudah lunas, belum dijadwalkan">{{ $hitungMenu['penjadwalan'] > 99 ? '99+' : $hitungMenu['penjadwalan'] }}</span>
+                        @endif
                         <span>Penjadwalan Asesmen</span>
                     </a>
                 </li>
@@ -64,7 +67,17 @@
                 <li>
                     <a href="{{ route('review-apl01.index') }}" class="waves-effect">
                         <i class="dripicons-document-edit"></i>
+                        @if ($hitungMenu['review_apl01'] ?? 0)
+                            <span class="badge rounded-pill bg-danger float-end" title="FR.APL.01 menunggu review">{{ $hitungMenu['review_apl01'] > 99 ? '99+' : $hitungMenu['review_apl01'] }}</span>
+                        @endif
                         <span>Review FR.APL.01</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ route('vouchers.index') }}" class="waves-effect">
+                        <i class="dripicons-ticket"></i>
+                        <span>Voucher</span>
                     </a>
                 </li>
 

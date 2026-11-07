@@ -1,2 +1,6 @@
 *
 !.gitignore
+# Avatar bawaan (vektor) ikut repo agar tersedia di semua server; avatar unggahan asesi tetap diabaikan.
+!avatars/
+avatars/*
+!avatars/default.svg

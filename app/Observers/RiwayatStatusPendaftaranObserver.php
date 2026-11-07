@@ -2,8 +2,10 @@
 
 namespace App\Observers;
 
+use App\Models\PendaftaranSertifikasi;
 use App\Models\RiwayatStatusPendaftaran;
 use App\Notifications\StatusPendaftaranNotifikasi;
+use App\Support\Cms\NotifikasiAdmin;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -23,11 +25,41 @@ class RiwayatStatusPendaftaranObserver
         }
 
         try {
-            $pendaftaran = $riwayat->pendaftaranSertifikasi()->with(['asesi', 'skemaSertifikasi', 'penilaianMuk'])->first();
+            $pendaftaran = $riwayat->pendaftaranSertifikasi()->with(['asesi', 'skemaSertifikasi', 'penilaianMuk', 'jadwalAsesmen'])->first();
             $pendaftaran?->asesi?->notify(new StatusPendaftaranNotifikasi($pendaftaran, $riwayat->status_ke));
+            if ($pendaftaran) {
+                $this->kabariAdmin($pendaftaran, $riwayat->status_ke);
+            }
         } catch (\Throwable $e) {
             // Notifikasi tidak boleh menggagalkan perubahan status (mis. webhook pembayaran).
             Log::error('Gagal menyusun notifikasi status pendaftaran', ['riwayat_id' => $riwayat->id, 'error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Lonceng CMS untuk kejadian yang perlu tindak lanjut admin. "submitted" sudah dikirim
+     * PendaftaranMasukNotifikasi (email + database) dari controller, jadi tidak diulang di sini.
+     */
+    private function kabariAdmin(PendaftaranSertifikasi $pendaftaran, string $status): void
+    {
+        $nama = $pendaftaran->asesi->name ?? 'Asesi';
+        $skema = $pendaftaran->skemaSertifikasi->title['id'] ?? '-';
+
+        match ($status) {
+            'paid' => NotifikasiAdmin::pemberitahuan(
+                'penjadwalan',
+                'Pembayaran lunas, perlu dijadwalkan',
+                "{$nama} telah melunasi pembayaran skema {$skema}"
+                    .($pendaftaran->pembayaran?->metode_pembayaran ? ' ('.$pendaftaran->pembayaran->metode_pembayaran.')' : '').'.',
+                route('penjadwalan-asesmen.create', $pendaftaran->kode_pendaftaran),
+            ),
+            'asesmen_selesai' => NotifikasiAdmin::pemberitahuan(
+                'asesmen',
+                'Asesmen selesai',
+                "Asesmen {$nama} untuk skema {$skema} telah selesai.",
+                $pendaftaran->jadwalAsesmen ? route('asesmen.show', $pendaftaran->jadwalAsesmen) : route('asesmen.index'),
+            ),
+            default => null,
+        };
     }
 }

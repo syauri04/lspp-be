@@ -2,12 +2,14 @@
 
 namespace App\Http\Requests;
 
-
+use App\Http\Requests\Concerns\PesanPasswordAsesi;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
 class SetPasswordRequest extends FormRequest
 {
+    use PesanPasswordAsesi;
+
     /**
      * Determine if the user is authorized to make this request.
      */

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\AboutPageController;
+use App\Http\Controllers\API\Auth\CaptchaController;
 use App\Http\Controllers\API\Auth\ChangePasswordController;
 use App\Http\Controllers\API\Auth\GoogleLoginController;
 use App\Http\Controllers\API\Auth\LoginController;
@@ -40,15 +41,18 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('auth')->group(function () {
-    Route::post('register', RegisterController::class)->middleware('throttle:5,1');
-    Route::post('login', LoginController::class)->middleware('throttle:5,1');
+    // Captcha gambar untuk form login & register lspp-fe (kode baru tiap permintaan).
+    Route::get('captcha', CaptchaController::class)->middleware('throttle:30,1,captcha');
+
+    Route::post('register', RegisterController::class)->middleware('throttle:5,1,auth-register');
+    Route::post('login', LoginController::class)->middleware('throttle:5,1,auth-login');
 
     Route::post('email/verify', VerifyEmailController::class)
-        ->middleware('signed')
+        ->middleware(['signed', 'throttle:10,1,auth-verify-email'])
         ->name('api.asesi.verify-email');
 
     Route::post('email/resend', ResendVerificationController::class)
-        ->middleware('throttle:3,1');
+        ->middleware('throttle:3,1,auth-resend');
 
     // asesi.website: tolak token asesor & token khusus MUK di endpoint akun lspp-fe
     Route::middleware(['auth:sanctum', 'asesi.website'])->group(function () {
@@ -56,11 +60,11 @@ Route::prefix('auth')->group(function () {
         Route::get('me', MeController::class);
 
         Route::post('profile', UpdateProfileController::class);
-        Route::post('set-password', SetPasswordController::class)->middleware('throttle:5,1');
-        Route::post('change-password', ChangePasswordController::class)->middleware('throttle:5,1');
+        Route::post('set-password', SetPasswordController::class)->middleware('throttle:5,1,auth-set-password');
+        Route::post('change-password', ChangePasswordController::class)->middleware('throttle:5,1,auth-change-password');
     });
 
-    Route::post('google', GoogleLoginController::class)->middleware('throttle:5,1');
+    Route::post('google', GoogleLoginController::class)->middleware('throttle:5,1,auth-google');
 });
 
 /*
@@ -319,7 +323,7 @@ Route::middleware(['auth:sanctum', 'asesi.website', 'throttle:60,1'])
         ]);
 
         Route::post('/', [PendaftaranSertifikasiController::class, 'store'])
-            ->middleware('throttle:5,1');
+            ->middleware('throttle:5,1,pendaftaran-store');
     });
 
 /*
@@ -363,6 +367,12 @@ Route::middleware(['auth:sanctum', 'asesi.website', 'throttle:60,1'])
             CheckoutController::class,
             'kirimBuktiTransfer',
         ])->middleware('throttle:5,1,bukti-transfer'); // prefix: penghitung terpisah dari throttle grup
+
+        // Voucher: 10x/menit per pengguna untuk mencegah menebak-nebak kode.
+        Route::post('/{pendaftaran:kode_pendaftaran}/voucher', [CheckoutController::class, 'pasangVoucher'])
+            ->middleware('throttle:10,1,checkout-voucher');
+        Route::delete('/{pendaftaran:kode_pendaftaran}/voucher', [CheckoutController::class, 'lepasVoucher'])
+            ->middleware('throttle:10,1,checkout-voucher');
 
         // Route::post('/{pendaftaran:kode_pendaftaran}/snap-token', [
         //     CheckoutController::class,

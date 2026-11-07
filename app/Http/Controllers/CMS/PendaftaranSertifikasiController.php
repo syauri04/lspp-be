@@ -8,9 +8,11 @@ use App\Models\Pembayaran;
 use App\Models\PendaftaranSertifikasi;
 use App\Notifications\PendaftaranDisetujuiNotifikasi;
 use App\Notifications\PendaftaranDitolakNotifikasi;
+use App\Services\Pembayaran\ResetSesiDoku;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PendaftaranSertifikasiController extends Controller
@@ -68,6 +70,7 @@ class PendaftaranSertifikasiController extends Controller
                 'kode_transaksi' => 'LSPP-'.strtoupper(substr($pendaftaran->kode_pendaftaran, 0, 8)).'-'.now()->timestamp,
                 'pendaftaran_sertifikasi_id' => $pendaftaran->id,
                 'jumlah' => $pendaftaran->harga_snapshot,
+                'jumlah_awal' => $pendaftaran->harga_snapshot, // harga sebelum potongan voucher
                 'status' => 'pending',
             ]);
         });
@@ -80,6 +83,24 @@ class PendaftaranSertifikasiController extends Controller
     /**
      * Reject: kirim notif alasan penolakan, tidak ada record pembayaran yang dibuat.
      */
+    /**
+     * Reset sesi pembayaran DOKU: asesi bisa memasang/melepas voucher lalu membuat sesi DOKU baru.
+     * Link DOKU lama tetap dikenali webhook (pembayaran lewat link lama tetap tercatat).
+     */
+    public function resetSesiPembayaran(Request $request, PendaftaranSertifikasi $pendaftaran, ResetSesiDoku $reset): RedirectResponse
+    {
+        abort_unless($pendaftaran->pembayaran, 404, 'Tagihan tidak ditemukan.');
+
+        try {
+            $tagihan = $reset->reset($pendaftaran->pembayaran, $request->user());
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return back()->with('success', "Sesi pembayaran direset. Kode transaksi baru: {$tagihan->kode_transaksi}. "
+            .'Asesi dapat memasang voucher lalu klik Bayar Sekarang untuk membuat sesi pembayaran baru.');
+    }
+
     public function reject(ReviewPendaftaranRequest $request, PendaftaranSertifikasi $pendaftaran): RedirectResponse
     {
         abort_unless(

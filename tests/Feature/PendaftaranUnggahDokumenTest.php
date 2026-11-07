@@ -74,3 +74,55 @@ it('pesan format per file', function () {
     expect($res->json('errors.cv.0'))->toBe('CV wajib berformat PDF.')
         ->and($res->json('errors.ijazah.0'))->toBe('Ijazah wajib diunggah.');
 });
+
+it('asesi Google tanpa password ditolak mendaftar (403 + kode), dokumen tidak diproses', function () {
+    $asesi = Asesi::factory()->tanpaPassword()->create();
+    $skema = MukFixture::skema();
+    $token = $asesi->createToken('auth_token')->plainTextToken;
+
+    $this->withToken($token)
+        ->post('/api/pendaftaran-sertifikasi', payloadPendaftaran($skema->id), ['Accept' => 'application/json'])
+        ->assertForbidden()
+        ->assertJsonPath('kode', 'password_belum_diatur');
+
+    expect($asesi->pendaftaranSertifikasi()->count())->toBe(0);
+});
+
+it('set password: pesan validasi Bahasa Indonesia, lalu bisa mendaftar', function () {
+    $asesi = Asesi::factory()->tanpaPassword()->create();
+    $skema = MukFixture::skema();
+    $token = $asesi->createToken('auth_token')->plainTextToken;
+
+    $this->withToken($token)
+        ->postJson('/api/auth/set-password', ['password' => 'abcdefgh', 'password_confirmation' => 'abcdefgh'])
+        ->assertStatus(422)
+        ->assertJsonPath('errors.password', [
+            'Password harus berisi huruf besar dan huruf kecil.',
+            'Password harus berisi minimal satu simbol (mis. ! @ # ?).',
+            'Password harus berisi minimal satu angka.',
+        ]);
+
+    $this->withToken($token)
+        ->postJson('/api/auth/set-password', ['password' => 'Rahasia#123', 'password_confirmation' => 'Rahasia#123'])
+        ->assertOk();
+
+    expect($asesi->fresh()->password)->not->toBeNull();
+
+    $this->withToken($token)
+        ->post('/api/pendaftaran-sertifikasi', payloadPendaftaran($skema->id), ['Accept' => 'application/json'])
+        ->assertCreated();
+});
+
+it('membuka halaman lain (daftar pendaftaran) tidak menghabiskan batas submit pendaftaran', function () {
+    $asesi = Asesi::factory()->create();
+    $skema = MukFixture::skema();
+    $token = $asesi->createToken('auth_token')->plainTextToken;
+
+    for ($i = 0; $i < 10; $i++) {
+        $this->withToken($token)->getJson('/api/pendaftaran-sertifikasi')->assertOk();
+    }
+
+    $this->withToken($token)
+        ->post('/api/pendaftaran-sertifikasi', payloadPendaftaran($skema->id), ['Accept' => 'application/json'])
+        ->assertCreated();
+});

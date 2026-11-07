@@ -41,6 +41,13 @@
                     </div>
                 @endif
 
+                @if (session('error'))
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        {{ session('error') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @endif
+
                 @if ($errors->any())
                     <div class="alert alert-danger">
                         <ul class="mb-0">
@@ -202,6 +209,16 @@
                                                     {{ number_format($pendaftaran->pembayaran->jumlah, 0, ',', '.') }}
                                                 </td>
                                             </tr>
+                                            @if ($pendaftaran->pembayaran->voucher_kode)
+                                                <tr>
+                                                    <th>Voucher</th>
+                                                    <td>
+                                                        <span class="font-monospace">{{ $pendaftaran->pembayaran->voucher_kode }}</span>:
+                                                        harga Rp {{ number_format($pendaftaran->pembayaran->hargaAwal(), 0, ',', '.') }}
+                                                        − potongan Rp {{ number_format($pendaftaran->pembayaran->potongan, 0, ',', '.') }}
+                                                    </td>
+                                                </tr>
+                                            @endif
                                             <tr>
                                                 <th>Status</th>
                                                 <td>{{ ucwords($pendaftaran->pembayaran->status) }}</td>
@@ -228,6 +245,33 @@
                                             @endif
                                         </tbody>
                                     </table>
+
+                                    @php
+                                        $tagihan = $pendaftaran->pembayaran;
+                                        $adaSesiDoku = filled(data_get($tagihan->gateway_payload, 'response.payment.url'));
+                                        $bisaReset = $adaSesiDoku && $tagihan->status === 'pending' && $pendaftaran->status === 'awaiting_payment';
+                                    @endphp
+                                    @if ($adaSesiDoku || ! empty($tagihan->sesi_doku_lama))
+                                        <div class="border-top mt-3 pt-3">
+                                            <h6 class="mb-1">Sesi Pembayaran Online (DOKU)</h6>
+                                            <p class="small text-muted mb-2">
+                                                {{ $adaSesiDoku ? 'Asesi sudah membuat sesi pembayaran DOKU; voucher terkunci.' : 'Belum ada sesi aktif.' }}
+                                                @if (! empty($tagihan->sesi_doku_lama))
+                                                    Sudah direset {{ count($tagihan->sesi_doku_lama) }}x
+                                                    (kode lama: {{ collect($tagihan->sesi_doku_lama)->pluck('kode_transaksi')->implode(', ') }}).
+                                                @endif
+                                            </p>
+                                            @if ($bisaReset)
+                                                <form action="{{ route('pendaftaran.reset-sesi-pembayaran', $pendaftaran->kode_pendaftaran) }}" method="POST"
+                                                    onsubmit="return confirm('Reset sesi pembayaran DOKU?\n\n• Asesi bisa memasang/melepas voucher lalu klik Bayar Sekarang lagi (kode transaksi baru).\n• Pastikan asesi BELUM membayar di link lama. Bila tetap terbayar lewat link lama, sistem tetap mencatatnya lunas.')">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                                                        <i class="mdi mdi-restart"></i> Reset Sesi Pembayaran
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    @endif
 
                                     @if ($pendaftaran->pembayaran->buktiPembayaran->isNotEmpty())
                                         <h6 class="mt-3">Bukti Transfer Manual</h6>

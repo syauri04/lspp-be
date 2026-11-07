@@ -10,6 +10,7 @@ use App\Models\PendaftaranSertifikasi;
 use App\Models\Pengaturan;
 use App\Models\RekeningPembayaran;
 use App\Services\Pembayaran\PembayaranManual;
+use App\Services\Pembayaran\VoucherCheckout;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
@@ -65,6 +66,7 @@ class CheckoutController extends Controller
                 'kode_pendaftaran' => $pendaftaran->kode_pendaftaran,
                 'skema' => $pendaftaran->skemaSertifikasi,
                 'jumlah' => $pembayaran->jumlah,
+                ...$this->ringkasanVoucher($pembayaran),
                 'kode_transaksi' => $pembayaran->kode_transaksi,
                 'batas_bayar' => $pembayaran->expired_at,
                 // Kalau asesi buka ulang halaman checkout sebelum bayar, payment_url lama
@@ -118,6 +120,72 @@ class CheckoutController extends Controller
             'message' => 'Bukti transfer berhasil dikirim dan akan diverifikasi admin LSP.',
             'data' => $this->buktiRingkas($bukti->load('rekening')),
         ], 201);
+    }
+
+    /**
+     * POST /api/checkout/{kode_pendaftaran}/voucher  {kode}
+     * Pasang (atau ganti) voucher. Total dihitung ulang di server; respons = ringkasan harga terbaru.
+     */
+    public function pasangVoucher(Request $request, PendaftaranSertifikasi $pendaftaran, VoucherCheckout $voucher): JsonResponse
+    {
+        $asesi = $this->asesiAtauTolak($request, $pendaftaran);
+        $data = $request->validate(
+            ['kode' => ['required', 'string', 'max:32']],
+            ['kode.required' => 'Masukkan kode voucher.', 'kode.max' => 'Kode voucher tidak valid.'],
+        );
+
+        $pembayaran = $voucher->pasang($this->tagihanPending($pendaftaran), $asesi, $data['kode']);
+
+        return response()->json([
+            'message' => $pembayaran->status === 'paid'
+                ? 'Voucher berhasil digunakan. Tagihan Anda lunas.'
+                : 'Voucher berhasil digunakan.',
+            'data' => $this->hasilVoucher($pembayaran),
+        ]);
+    }
+
+    /** DELETE /api/checkout/{kode_pendaftaran}/voucher */
+    public function lepasVoucher(Request $request, PendaftaranSertifikasi $pendaftaran, VoucherCheckout $voucher): JsonResponse
+    {
+        $this->asesiAtauTolak($request, $pendaftaran);
+        $pembayaran = $voucher->lepas($this->tagihanPending($pendaftaran));
+
+        return response()->json([
+            'message' => 'Voucher dilepas.',
+            'data' => $this->hasilVoucher($pembayaran),
+        ]);
+    }
+
+    private function tagihanPending(PendaftaranSertifikasi $pendaftaran): Pembayaran
+    {
+        abort_unless($pendaftaran->status === 'awaiting_payment', 404, 'Pendaftaran ini tidak dalam status menunggu pembayaran.');
+        $pembayaran = $pendaftaran->pembayaran;
+        abort_if(! $pembayaran || $pembayaran->status !== 'pending', 404, 'Tagihan pembayaran tidak ditemukan atau sudah tidak berlaku.');
+
+        return $pembayaran;
+    }
+
+    private function hasilVoucher(Pembayaran $pembayaran): array
+    {
+        return ['status' => $pembayaran->status, 'jumlah' => $pembayaran->jumlah, ...$this->ringkasanVoucher($pembayaran)];
+    }
+
+    /** Rincian harga & voucher untuk ringkasan pembayaran di checkout. */
+    private function ringkasanVoucher(Pembayaran $pembayaran): array
+    {
+        $pemakaian = $pembayaran->voucherPemakaian()->with('voucher')->first();
+
+        return [
+            'harga_awal' => number_format($pembayaran->hargaAwal(), 2, '.', ''),
+            'potongan' => $pembayaran->potongan ?? '0.00',
+            'voucher' => $pemakaian ? [
+                'kode' => $pemakaian->kode,
+                'nama' => $pemakaian->voucher?->nama,
+                'keterangan' => $pemakaian->voucher?->labelNilai(),
+            ] : null,
+            // null = voucher boleh dipasang/dilepas; selain itu alasan terkunci (ditampilkan di FE).
+            'voucher_terkunci' => VoucherCheckout::alasanTerkunci($pembayaran),
+        ];
     }
 
     /** Ringkasan bukti transfer untuk asesi (tanpa path berkas). */

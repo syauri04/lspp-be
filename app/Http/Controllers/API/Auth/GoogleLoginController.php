@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\GoogleLoginRequest;
 use App\Models\Asesi;
 use Google_Client;
-use Illuminate\Support\Str;
 
 class GoogleLoginController extends Controller
 {
@@ -42,9 +41,17 @@ class GoogleLoginController extends Controller
             ->where('provider_id', $googleId)
             ->first();
 
+        if ($asesi?->nonaktif()) {
+            return response()->json(['message' => Asesi::PESAN_NONAKTIF], 403);
+        }
+
         if (! $asesi) {
             // cek apakah email sudah terdaftar lewat cara manual (register biasa)
             $existing = Asesi::where('email', $email)->first();
+
+            if ($existing?->nonaktif()) {
+                return response()->json(['message' => Asesi::PESAN_NONAKTIF], 403);
+            }
 
             if ($existing) {
                 // link akun manual yang sudah ada ke Google (gak bikin duplikat)
