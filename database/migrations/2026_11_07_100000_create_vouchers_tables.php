@@ -29,8 +29,11 @@ return new class extends Migration
             $table->decimal('maks_potongan', 12, 2)->nullable(); // batas potongan untuk tipe persentase
             $table->unsignedInteger('kuota')->nullable(); // total pemakaian; null = tanpa batas
             $table->unsignedInteger('maks_per_asesi')->nullable()->default(1); // null = tanpa batas
-            $table->timestamp('mulai_at');
-            $table->timestamp('berakhir_at');
+            // dateTime (bukan timestamp): di MySQL/MariaDB dengan explicit_defaults_for_timestamp=OFF
+            // (mis. hosting), timestamp NOT NULL kedua diberi default '0000-00-00' dan ditolak mode strict.
+            // Nilai tetap disimpan dalam UTC oleh aplikasi.
+            $table->dateTime('mulai_at');
+            $table->dateTime('berakhir_at');
             $table->boolean('aktif')->default(true);
             $table->foreignId('dibuat_oleh')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
