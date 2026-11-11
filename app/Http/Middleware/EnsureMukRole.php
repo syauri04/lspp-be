@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\Asesi;
 use App\Models\Asesor;
+use App\Models\User;
+use App\Services\Muk\AksesAdminMuk;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -17,7 +19,9 @@ use Symfony\Component\HttpFoundation\Response;
  * - token punya ability "muk:{peran}" secara EKSPLISIT. Token lspp-fe berability ['*']
  *   sengaja ditolak (tidak pakai tokenCan(), karena '*' akan lolos), sehingga login MUK
  *   terpisah dari login website utama,
- * - asesor masih berstatus aktif (dicek tiap request, bukan hanya saat login).
+ * - asesor masih berstatus aktif (dicek tiap request, bukan hanya saat login),
+ * - "admin" = user CMS super admin dengan token baca-saja dari AksesAdminMuk (ability "muk:admin"
+ *   + penilaian tertentu); peran super admin dicek ulang tiap request.
  */
 class EnsureMukRole
 {
@@ -36,6 +40,11 @@ class EnsureMukRole
             abort(403, 'Akses ditolak untuk peran ini.');
         }
 
+        if ($user instanceof User && ! $user->hasRole(AksesAdminMuk::PERAN)) {
+            $token->delete();
+            abort(403, 'Akses admin MUK dicabut.');
+        }
+
         if ($user instanceof Asesor && $user->status !== 'aktif') {
             $user->tokens()->delete();
             abort(401, 'Akun asesor tidak aktif.');
@@ -49,6 +58,7 @@ class EnsureMukRole
         return match (true) {
             $user instanceof Asesi => 'asesi',
             $user instanceof Asesor => 'asesor',
+            $user instanceof User => 'admin',
             default => null,
         };
     }

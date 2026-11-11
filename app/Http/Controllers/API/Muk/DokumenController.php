@@ -54,6 +54,24 @@ class DokumenController extends Controller
         return self::respons($request, $dokumen, $handler);
     }
 
+    /** Koreksi isi dokumen terkirim oleh super admin: body sama dengan PATCH + alasan wajib. */
+    public function koreksi(Request $request, int $penilaian, string $slug): DokumenPenilaianResource
+    {
+        [$dokumen, $handler] = $this->resolver->temukan($request->user(), $penilaian, $slug);
+        Gate::authorize('koreksi', $dokumen);
+
+        $validated = $request->validate([
+            ...$handler->rulesSimpan($dokumen),
+            'alasan' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+        $alasan = trim($validated['alasan']);
+        unset($validated['alasan']);
+
+        [$dokumen, $jumlah] = $this->workflow->koreksiAdmin($dokumen, $handler, $validated, $alasan, $request->user());
+
+        return self::respons($request, $dokumen, $handler)->additional(['meta' => ['jumlah_perubahan' => $jumlah]]);
+    }
+
     public function tandaTangan(Request $request, int $penilaian, string $slug): DokumenPenilaianResource
     {
         [$dokumen, $handler] = $this->resolver->temukan($request->user(), $penilaian, $slug);

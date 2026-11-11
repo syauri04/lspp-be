@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Muk\AksesAdminMuk;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -97,7 +98,9 @@ class PenilaianMuk extends Model
         return match (true) {
             $user instanceof Asesi => $query->forAsesi($user),
             $user instanceof Asesor => $query->forAsesor($user),
-            default => throw new InvalidArgumentException('User bukan asesi/asesor.'),
+            // Super admin (token baca-saja): hanya penilaian yang tercantum di token.
+            $user instanceof User => $query->whereKey(AksesAdminMuk::penilaianDariToken($user)),
+            default => throw new InvalidArgumentException('User bukan asesi/asesor/admin.'),
         };
     }
 

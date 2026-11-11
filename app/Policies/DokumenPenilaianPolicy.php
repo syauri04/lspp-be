@@ -7,11 +7,14 @@ use App\Models\Asesi;
 use App\Models\Asesor;
 use App\Models\DokumenPenilaian;
 use App\Models\JenisDokumenMuk;
+use App\Models\PenerbitanSertifikasi;
 use App\Models\PenilaianMuk;
+use App\Models\User;
 use App\Services\Muk\AksesDokumen;
 use App\Services\Muk\Dokumen\DisiapkanDanDinilai;
 use App\Services\Muk\Dokumen\DisiapkanPeninjau;
 use App\Services\Muk\Dokumen\DokumenHandlerRegistry;
+use App\Services\Muk\Dokumen\TanpaIsian;
 use App\Services\Muk\DokumenWorkflow;
 use Illuminate\Auth\Access\Response;
 
@@ -28,7 +31,44 @@ class DokumenPenilaianPolicy
         private DokumenHandlerRegistry $registry,
     ) {}
 
-    public function view(Asesi|Asesor $user, DokumenPenilaian $dokumen): Response
+    /**
+     * Super admin (token dari CMS) hanya boleh "view" dan "koreksi". Semua aksi lain (isi, review, setujui,
+     * tarik, siapkan, nilai, ...) DITOLAK di sini secara eksplisit, termasuk aksi yang ditambahkan nanti.
+     */
+    public function before(mixed $user, string $ability): ?bool
+    {
+        return $user instanceof User && ! in_array($ability, ['view', 'koreksi'], true) ? false : null;
+    }
+
+    /**
+     * Koreksi isi oleh super admin: dokumen sudah dikirim, punya isian, dan sertifikat belum terbit.
+     * Asesi/asesor tidak pernah boleh (jalur ubah mereka adalah 'isi').
+     */
+    public function koreksi(Asesi|Asesor|User $user, DokumenPenilaian $dokumen): Response
+    {
+        if (! $user instanceof User || ! $user->hasRole('super-admin')) {
+            return Response::deny('Hanya super admin yang dapat mengoreksi dokumen.');
+        }
+        $view = $this->view($user, $dokumen);
+        if ($view->denied()) {
+            return $view;
+        }
+        if ($this->registry->untukKode($dokumen->jenisDokumen->kode) instanceof TanpaIsian) {
+            return Response::deny('Dokumen ini tidak memiliki isian yang dapat dikoreksi.');
+        }
+        if (! in_array($dokumen->status, DokumenPenilaian::STATUS_TERKIRIM, true)) {
+            return Response::deny('Hanya dokumen yang sudah dikirim yang dapat dikoreksi.');
+        }
+        $terbit = PenerbitanSertifikasi::query()
+            ->where('pendaftaran_sertifikasi_id', $dokumen->penilaianMuk->pendaftaran_sertifikasi_id)
+            ->where('status', PenerbitanSertifikasi::SELESAI)
+            ->exists();
+
+        return $terbit ? Response::deny('Sertifikat sudah terbit; dokumen dikunci dan tidak dapat dikoreksi.') : Response::allow();
+    }
+
+    /** Baca: asesi, asesor, dan super admin (hanya dokumen terkirim, lihat AksesDokumen). */
+    public function view(Asesi|Asesor|User $user, DokumenPenilaian $dokumen): Response
     {
         if (! $this->milik($user, $dokumen)) {
             return Response::denyAsNotFound();
@@ -192,7 +232,7 @@ class DokumenPenilaianPolicy
             : Response::deny('Hanya dokumen yang menunggu persetujuan yang dapat ditarik kembali.');
     }
 
-    private function milik(Asesi|Asesor $user, DokumenPenilaian $dokumen): bool
+    private function milik(Asesi|Asesor|User $user, DokumenPenilaian $dokumen): bool
     {
         return PenilaianMuk::query()->forUser($user)->whereKey($dokumen->penilaian_muk_id)->exists();
     }

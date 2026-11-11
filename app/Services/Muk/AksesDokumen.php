@@ -26,6 +26,11 @@ class AksesDokumen
         $kode = $dokumen->jenisDokumen->kode;
         $kategori = $dokumen->jenisDokumen->kategori;
 
+        // Super admin (baca & cetak): hanya dokumen yang sudah dikirim / selesai.
+        if ($peran === 'admin') {
+            return in_array($dokumen->status, DokumenPenilaian::STATUS_TERKIRIM, true) ? null : 'Dokumen belum dikirim pengisinya.';
+        }
+
         // MAPA diisi asesor (bukan asesi).
         if ($kategori === 'MAPA') {
             return $peran === 'asesor' ? null : 'Dokumen ini diisi oleh asesor.';

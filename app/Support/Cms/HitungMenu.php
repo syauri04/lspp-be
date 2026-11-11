@@ -6,6 +6,7 @@ use App\Models\BuktiPembayaran;
 use App\Models\DokumenPenilaian;
 use App\Models\JenisDokumenMuk;
 use App\Models\PendaftaranSertifikasi;
+use App\Models\PenerbitanSertifikasi;
 
 /**
  * Jumlah pekerjaan yang menunggu admin, untuk badge menu sidebar CMS.
@@ -29,6 +30,8 @@ class HitungMenu
                 ->kode(JenisDokumenMuk::APL_01)
                 ->where('status', DokumenPenilaian::STATUS_MENUNGGU_REVIEW)
                 ->count(),
+            // Sertifikat belum diselesaikan (menunggu dokumen + siap diselesaikan).
+            'penerbitan_sertifikat' => PenerbitanSertifikasi::where('status', '!=', PenerbitanSertifikasi::SELESAI)->count(),
         ]);
     }
 }

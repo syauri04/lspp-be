@@ -39,6 +39,11 @@ return [
     // sanctum.expiration, supaya sesi lspp-fe tidak ikut terdampak.
     'token_ttl_minutes' => (int) env('MUK_TOKEN_TTL_MINUTES', 480),
 
+    // Super admin membuka MUK dari CMS (baca & cetak): kode sekali pakai (detik) ditukar
+    // menjadi token baca-saja yang hanya berlaku untuk SATU penilaian (menit).
+    'admin_kode_ttl_seconds' => 60,
+    'admin_token_ttl_minutes' => (int) env('MUK_ADMIN_TOKEN_TTL_MINUTES', 120),
+
     // Nama token di personal_access_tokens, untuk membedakan dari token lspp-fe.
     'token_name' => 'muk',
 

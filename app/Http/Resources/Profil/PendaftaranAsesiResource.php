@@ -2,7 +2,9 @@
 
 namespace App\Http\Resources\Profil;
 
+use App\Http\Resources\Sertifikat\SertifikatPublikResource;
 use App\Models\PendaftaranSertifikasi;
+use App\Models\PenerbitanSertifikasi;
 use App\Models\PenilaianMuk;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -38,9 +40,12 @@ class PendaftaranAsesiResource extends JsonResource
         return [
             'kode_pendaftaran' => $this->kode_pendaftaran,
             'status' => $this->status,
-            'status_label' => $this->menungguVerifikasi()
-                ? 'Menunggu verifikasi pembayaran'
-                : (PendaftaranSertifikasi::STATUS_LABEL[$this->status] ?? $this->status),
+            'status_label' => match (true) {
+                $this->menungguVerifikasi() => 'Menunggu verifikasi pembayaran',
+                // Asesmen sudah selesai tetapi SK / e-sertifikat belum diterbitkan LSP.
+                $this->status === 'asesmen_selesai' => 'Menunggu penerbitan sertifikat',
+                default => PendaftaranSertifikasi::STATUS_LABEL[$this->status] ?? $this->status,
+            },
             'kelompok' => PendaftaranSertifikasi::kelompokDari($this->status),
             'catatan_admin' => $this->status === 'rejected' ? $this->catatan_admin : null,
             'diajukan_at' => ($this->submitted_at ?? $this->created_at)?->toIso8601String(),
@@ -71,6 +76,7 @@ class PendaftaranAsesiResource extends JsonResource
                 'selesai_at' => $penilaian->selesai_at?->toIso8601String(),
             ] : null,
             'aksi' => $this->aksi($penilaian),
+            'sertifikasi' => $this->sertifikasi(),
             ...($this->denganTimeline ? [
                 'pembayaran' => $this->pembayaran ? [
                     'status' => $this->pembayaran->status,
@@ -98,6 +104,32 @@ class PendaftaranAsesiResource extends JsonResource
         }
 
         return null;
+    }
+
+    /**
+     * Hasil sertifikasi (setelah super admin menyelesaikan proses): hanya SK yang ditandai untuk asesi
+     * (config sertifikasi.dokumen.*.asesi) dan e-sertifikat. Berkas diunduh lewat endpoint terotorisasi.
+     */
+    private function sertifikasi(): ?array
+    {
+        $penerbitan = $this->relationLoaded('penerbitanSertifikasi') ? $this->penerbitanSertifikasi : null;
+        if (! $penerbitan?->selesai()) {
+            return null;
+        }
+        $jenis = PenerbitanSertifikasi::jenisDokumen();
+        $unduh = fn (string $berkas) => "/pendaftaran-sertifikasi/{$this->kode_pendaftaran}/sertifikasi/{$berkas}";
+
+        return [
+            'hasil' => $penerbitan->hasil,
+            'selesai_at' => $penerbitan->diselesaikan_at?->toIso8601String(),
+            'dokumen' => $penerbitan->dokumen
+                ->filter(fn ($d) => $jenis[$d->jenis]['asesi'] ?? false)
+                ->map(fn ($d) => ['jenis' => $d->jenis, 'label' => $jenis[$d->jenis]['label'], 'unduh' => $unduh($d->jenis)])
+                ->values()->all(),
+            'sertifikat' => $penerbitan->sertifikat
+                ? [...(new SertifikatPublikResource($penerbitan->sertifikat))->resolve(), 'unduh' => $unduh('e-sertifikat')]
+                : null,
+        ];
     }
 
     /** Menunggu pembayaran dan bukti transfer manual sedang diverifikasi admin. */

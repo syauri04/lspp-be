@@ -119,8 +119,8 @@ describe('dokumen penutup & penyelesaian penilaian', function () {
         $this->withToken($tokenAsesi)->getJson("{$base}/ak-03")
             ->assertOk()
             ->assertJsonPath('data.header.tuk', 'sewaktu')
-            ->assertJsonCount(9, 'data.komponen');
-        $komponen = array_fill(0, 9, ['hasil' => 'ya']);
+            ->assertJsonCount(10, 'data.komponen');
+        $komponen = array_fill(0, 10, ['hasil' => 'ya']);
         $komponen[3] = ['hasil' => null];
         $this->withToken($tokenAsesi)->patchJson("{$base}/ak-03", ['isian' => ['komponen' => $komponen]])->assertOk();
         $this->withToken($tokenAsesi)->postJson("{$base}/ak-03/submit")->assertJsonValidationErrors('isian.komponen.3');
@@ -190,7 +190,7 @@ describe('dokumen penutup & penyelesaian penilaian', function () {
         akunBaru();
 
         // Asesi masih dapat mengisi & mengirim umpan balik.
-        $this->withToken($tokenAsesi)->patchJson("{$base}/ak-03", ['isian' => ['komponen' => array_fill(0, 9, ['hasil' => 'ya'])]])->assertOk();
+        $this->withToken($tokenAsesi)->patchJson("{$base}/ak-03", ['isian' => ['komponen' => array_fill(0, 10, ['hasil' => 'ya'])]])->assertOk();
         $this->withToken($tokenAsesi)->postJson("{$base}/ak-03/submit")->assertOk()->assertJsonPath('data.dokumen.status', DokumenPenilaian::STATUS_SELESAI);
         expect($p->fresh()->status)->toBe(PenilaianMuk::STATUS_SELESAI_BELUM_KOMPETEN);
     });

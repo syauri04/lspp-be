@@ -4,6 +4,7 @@ namespace App\Http\Resources\Muk;
 
 use App\Http\Middleware\EnsureMukRole;
 use App\Models\Asesi;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,18 @@ class MukProfileResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Super admin CMS (akses baca & cetak).
+        if ($this->resource instanceof User) {
+            return [
+                'id' => $this->id,
+                'role' => 'admin',
+                'name' => $this->name,
+                'email' => $this->email,
+                'phone' => null,
+                'avatar_url' => null,
+            ];
+        }
+
         $isAsesi = $this->resource instanceof Asesi;
 
         return [

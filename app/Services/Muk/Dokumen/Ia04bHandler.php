@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
  * Ya/Tidak & rekomendasi K/BK, menandatangani; asesi menyetujui. Penyusun/validator dibekukan.
  *
  * Isian tersimpan: {
- *   tuk, tanggal,
+ *   tuk, tanggal, judul_kegiatan,
  *   aspek: [{ lingkup, pertanyaan, kesesuaian }],         // server-managed (template)
  *   jawaban: [{ tanggapan, pencapaian, kesesuaian }],     // sejajar aspek; kesesuaian awal dari template
  *   tambahan: [{ lingkup, pertanyaan, kesesuaian, tanggapan, pencapaian }],
@@ -54,9 +54,10 @@ class Ia04bHandler extends PersetujuanHandler implements PunyaPenandatangan
         $pencapaian = ['nullable', Rule::in(['ya', 'tidak'])];
 
         return [
-            'isian' => ['required', 'array:tuk,tanggal,jawaban,tambahan,rekomendasi_teks,rekomendasi'],
+            'isian' => ['required', 'array:tuk,tanggal,judul_kegiatan,jawaban,tambahan,rekomendasi_teks,rekomendasi'],
             'isian.tuk' => ['nullable', Rule::in(array_keys(self::TUK))],
             'isian.tanggal' => ['nullable', 'date_format:Y-m-d'],
+            'isian.judul_kegiatan' => ['nullable', 'string', 'max:500'],
             'isian.jawaban' => ['sometimes', 'array', 'max:30'],
             'isian.jawaban.*' => ['array:tanggapan,pencapaian,kesesuaian'],
             'isian.jawaban.*.kesesuaian' => ['nullable', 'string', 'max:500'],
@@ -90,6 +91,9 @@ class Ia04bHandler extends PersetujuanHandler implements PunyaPenandatangan
         }
         if ($d['tanggal'] === null) {
             $errors['isian.tanggal'] = 'Isi tanggal.';
+        }
+        if ($d['judul_kegiatan'] === null) {
+            $errors['isian.judul_kegiatan'] = 'Isi judul kegiatan terstruktur.';
         }
         if ($d['aspek'] === [] && $d['tambahan'] === []) {
             $errors['isian.jawaban'] = 'Belum ada aspek penilaian. Tambahkan pertanyaan atau minta admin mengisi Template KT di CMS.';
@@ -164,6 +168,7 @@ class Ia04bHandler extends PersetujuanHandler implements PunyaPenandatangan
         return [
             'tuk' => self::tukSah($data['tuk'] ?? null),
             'tanggal' => self::tanggalSah($data['tanggal'] ?? null),
+            'judul_kegiatan' => self::teks($data['judul_kegiatan'] ?? null, 500),
             'aspek' => $aspek,
             'jawaban' => $jawaban,
             'tambahan' => collect((array) ($data['tambahan'] ?? []))

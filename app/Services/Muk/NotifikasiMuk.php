@@ -5,6 +5,7 @@ namespace App\Services\Muk;
 use App\Models\DokumenPenilaian;
 use App\Models\JenisDokumenMuk;
 use App\Models\User;
+use App\Notifications\Muk\DokumenDikoreksiNotifikasi;
 use App\Notifications\Muk\DokumenDitinjauNotifikasi;
 use App\Notifications\Muk\DokumenPersetujuanNotifikasi;
 use App\Notifications\Muk\DokumenSiapDitinjauNotifikasi;
@@ -88,6 +89,13 @@ class NotifikasiMuk
                 }
             }
         });
+    }
+
+    /** Super admin mengoreksi isi dokumen terkirim -> kabari asesor penilaian tsb. */
+    public function setelahDikoreksi(DokumenPenilaian $dokumen, string $alasan, int $jumlahPerubahan): void
+    {
+        $this->aman(fn () => $dokumen->penilaianMuk->jadwalAsesmen?->asesor
+            ?->notify(new DokumenDikoreksiNotifikasi($dokumen, $alasan, $jumlahPerubahan)));
     }
 
     private function kirimKeAdmin(DokumenPenilaian $dokumen): void

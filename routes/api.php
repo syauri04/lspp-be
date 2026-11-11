@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Auth\ChangePasswordController;
 use App\Http\Controllers\API\Auth\GoogleLoginController;
 use App\Http\Controllers\API\Auth\LoginController;
 use App\Http\Controllers\API\Auth\LogoutController;
+use App\Http\Controllers\API\Auth\LupaPasswordController;
 use App\Http\Controllers\API\Auth\MeController;
 use App\Http\Controllers\API\Auth\RegisterController;
 use App\Http\Controllers\API\Auth\ResendVerificationController;
@@ -28,8 +29,10 @@ use App\Http\Controllers\API\NewsArticleController;
 use App\Http\Controllers\API\Pendaftaran\CheckoutController;
 use App\Http\Controllers\API\Pendaftaran\DokuWebhookController;
 use App\Http\Controllers\API\Pendaftaran\PendaftaranSertifikasiController;
+use App\Http\Controllers\API\Pendaftaran\SertifikasiAsesiController;
 use App\Http\Controllers\API\Profil\NotifikasiController;
 use App\Http\Controllers\API\SertifikasiController;
+use App\Http\Controllers\API\Sertifikat\VerifikasiSertifikatController;
 use App\Http\Controllers\API\StrukturController;
 use App\Http\Controllers\API\TukController;
 use Illuminate\Support\Facades\Route;
@@ -65,6 +68,10 @@ Route::prefix('auth')->group(function () {
     });
 
     Route::post('google', GoogleLoginController::class)->middleware('throttle:5,1,auth-google');
+
+    // Lupa password asesi: kirim link (captcha + 3x/menit per IP) & atur ulang (5x/menit per IP).
+    Route::post('forgot-password', [LupaPasswordController::class, 'kirimLink'])->middleware('throttle:3,1,auth-forgot');
+    Route::post('reset-password', [LupaPasswordController::class, 'reset'])->middleware('throttle:5,1,auth-reset');
 });
 
 /*
@@ -83,14 +90,22 @@ Route::prefix('muk')->group(function () {
             Route::post('asesor/login', [MukAuthController::class, 'loginAsesor']);
         });
 
-        Route::middleware(['auth:sanctum', 'muk.role:asesi,asesor', 'throttle:60,1'])->group(function () {
+        // Super admin dari CMS: tukar kode sekali pakai -> token baca-saja satu penilaian.
+        Route::post('admin/tukar', [MukAuthController::class, 'tukarAdmin'])->middleware('throttle:10,1,muk-admin-tukar');
+
+        Route::middleware(['auth:sanctum', 'muk.role:asesi,asesor,admin', 'throttle:60,1'])->group(function () {
             Route::get('me', [MukAuthController::class, 'me']);
             Route::post('logout', [MukAuthController::class, 'logout']);
         });
+
+        // Asesor mengganti password sendiri (akun dibuat admin di CMS). Asesi mengubah password di website.
+        Route::put('password', [MukAuthController::class, 'ubahPassword'])
+            ->middleware(['auth:sanctum', 'muk.role:asesor', 'throttle:5,1,muk-ubah-password']);
     });
 
-    // Terbuka untuk asesi & asesor; hasil di-scope per pemilik di controller.
-    Route::middleware(['auth:sanctum', 'muk.role:asesi,asesor', 'throttle:60,1'])->group(function () {
+    // BACA: asesi, asesor, & super admin (token baca-saja satu penilaian); di-scope per pemilik.
+    // Jalur tulis di bawah TIDAK menerima peran admin.
+    Route::middleware(['auth:sanctum', 'muk.role:asesi,asesor,admin', 'throttle:muk-baca'])->group(function () {
         Route::get('penilaian', [MukPenilaianController::class, 'index']);
         Route::get('penilaian/{penilaian}', [MukPenilaianController::class, 'show'])->whereNumber('penilaian');
 
@@ -106,6 +121,11 @@ Route::prefix('muk')->group(function () {
         Route::get('penilaian/{penilaian}/dokumen/apl-01/relevan/{relevan}/file', [MukApl01RelevanController::class, 'show'])
             ->whereNumber(['penilaian', 'relevan']);
     });
+
+    // Koreksi isi dokumen terkirim oleh super admin (dicek policy 'koreksi': sertifikat belum terbit).
+    Route::middleware(['auth:sanctum', 'muk.role:admin', 'throttle:muk-aksi'])
+        ->patch('penilaian/{penilaian}/dokumen/{slug}/koreksi', [MukDokumenController::class, 'koreksi'])
+        ->whereNumber('penilaian');
 
     // Tinjauan asesor (FR.APL.02) & penentuan metode asesmen.
     Route::middleware(['auth:sanctum', 'muk.role:asesor', 'throttle:muk-aksi'])
@@ -324,7 +344,21 @@ Route::middleware(['auth:sanctum', 'asesi.website', 'throttle:60,1'])
 
         Route::post('/', [PendaftaranSertifikasiController::class, 'store'])
             ->middleware('throttle:5,1,pendaftaran-store');
+
+        // Unduh SK hasil uji / e-sertifikat milik sendiri (setelah proses sertifikasi selesai).
+        Route::get('/{pendaftaran:kode_pendaftaran}/sertifikasi/{berkas}', [SertifikasiAsesiController::class, 'unduh'])
+            ->where('berkas', '[a-z_-]+')
+            ->middleware('throttle:30,1,sertifikasi-unduh');
     });
+
+/*
+|--------------------------------------------------------------------------
+| Verifikasi e-sertifikat (publik)
+|--------------------------------------------------------------------------
+| Cocok persis no. blanko / no. sertifikat; dibatasi per IP agar tidak dipakai menyisir data.
+*/
+Route::get('sertifikat/verifikasi', VerifikasiSertifikatController::class)
+    ->middleware('throttle:20,1,sertifikat-verifikasi');
 
 /*
 |--------------------------------------------------------------------------

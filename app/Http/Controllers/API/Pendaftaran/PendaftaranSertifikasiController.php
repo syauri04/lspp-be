@@ -71,6 +71,8 @@ class PendaftaranSertifikasiController extends Controller
         'jadwalAsesmen.asesor:id,nama',
         'penilaianMuk:id,pendaftaran_sertifikasi_id,status,metode_asesmen,selesai_at',
         'pembayaran.buktiMenunggu',
+        'penerbitanSertifikasi.dokumen:id,penerbitan_sertifikasi_id,jenis',
+        'penerbitanSertifikasi.sertifikat',
     ];
 
     /**

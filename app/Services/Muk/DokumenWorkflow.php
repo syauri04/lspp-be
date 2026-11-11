@@ -4,13 +4,18 @@ namespace App\Services\Muk;
 
 use App\Models\DokumenPenilaian;
 use App\Models\JenisDokumenMuk;
+use App\Models\PenerbitanSertifikasi;
 use App\Models\PenilaianMuk;
 use App\Models\RiwayatDokumenPenilaian;
+use App\Models\RiwayatPenerbitanSertifikasi;
+use App\Models\User;
 use App\Services\Muk\Dokumen\Ak02Handler;
+use App\Services\Muk\Dokumen\Apl02Handler;
 use App\Services\Muk\Dokumen\DokumenHandler;
 use App\Services\Muk\Dokumen\TanpaIsian;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +32,9 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  */
 class DokumenWorkflow
 {
+    /** Batas jumlah field sebelum/sesudah yang dicatat per koreksi (jumlah total tetap dicatat). */
+    public const MAKS_JEJAK_KOREKSI = 100;
+
     /** Status yang masih boleh diubah oleh pengisi dokumen. */
     public const DAPAT_DIUBAH = [DokumenPenilaian::STATUS_BELUM_DIISI, DokumenPenilaian::STATUS_DRAFT];
 
@@ -146,10 +154,7 @@ class DokumenWorkflow
                 );
             }
 
-            $errors = $handler->kesalahanSubmit($d);
-            if ($handler->butuhTandaTangan() && ! $this->ttd->ada($d->{self::kolomTtd($handler->pengisi())[0]})) {
-                $errors['tanda_tangan'] = 'Tanda tangani dokumen sebelum mengirim.';
-            }
+            $errors = $this->kekuranganKirim($d, $handler);
             if ($errors !== []) {
                 throw ValidationException::withMessages(array_map(fn ($m) => [$m], $errors));
             }
@@ -496,6 +501,145 @@ class DokumenWorkflow
     }
 
     /**
+     * Koreksi isi dokumen terkirim oleh super admin (tanda tangan & persetujuan dipertahankan).
+     * - hanya selama penerbitan sertifikat belum selesai (dicek ulang di dalam lock),
+     * - isian divalidasi dengan aturan simpan yang sama + harus tetap lengkap seperti saat Kirim,
+     * - rekomendasi lanjutan FR.IA.08 yang sudah diterapkan tidak boleh berubah,
+     * - perubahan rekomendasi FR.AK.02 pada penilaian yang sudah selesai ikut menyinkronkan
+     *   status penilaian & hasil antrean penerbitan (ditolak bila E-Sertifikat sudah diisi),
+     * - riwayat mencatat alasan + daftar field sebelum/sesudah; asesor diberi tahu setelah commit.
+     *
+     * @return array{0: DokumenPenilaian, 1: int} dokumen & jumlah field yang berubah (0 = tidak ada perubahan)
+     */
+    public function koreksiAdmin(DokumenPenilaian $dokumen, DokumenHandler $handler, array $validated, string $alasan, User $pelaku): array
+    {
+        $hapusNanti = [];
+
+        [$hasil, $perubahan] = DB::transaction(function () use ($dokumen, $handler, $validated, $alasan, $pelaku, &$hapusNanti) {
+            $d = $this->kunci($dokumen);
+            if (! in_array($d->status, DokumenPenilaian::STATUS_TERKIRIM, true)) {
+                throw new ConflictHttpException('Hanya dokumen yang sudah dikirim yang dapat dikoreksi.');
+            }
+            $penilaian = $d->penilaianMuk;
+            $penerbitan = PenerbitanSertifikasi::query()
+                ->where('pendaftaran_sertifikasi_id', $penilaian->pendaftaran_sertifikasi_id)
+                ->lockForUpdate()
+                ->first();
+            if ($penerbitan?->selesai()) {
+                throw new ConflictHttpException('Sertifikat sudah terbit; dokumen MUK tidak dapat dikoreksi lagi.');
+            }
+
+            $kode = $d->jenisDokumen->kode;
+            $sebelum = $this->jejakIsi($d, $handler);
+            $lanjutanSebelum = $handler instanceof Dokumen\SetelahSelesai ? AsesmenLanjutan::dariPenilaian($penilaian) : null;
+            $rekomendasiSebelum = $kode === JenisDokumenMuk::AK_02 ? Ak02Handler::keputusan($d)['rekomendasi'] : null;
+
+            if (! $handler->simpan($d, $validated, $hapusNanti)) {
+                return [$d, []];
+            }
+            $d->save();
+            $d->unsetRelation('apl02Jawaban');
+
+            $errors = $handler->kesalahanSubmit($d);
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+
+            if ($handler instanceof Dokumen\SetelahSelesai && AsesmenLanjutan::dariPenilaian($penilaian->fresh()) !== $lanjutanSebelum) {
+                throw ValidationException::withMessages(['isian.rekomendasi' => 'Rekomendasi asesmen lanjutan sudah diterapkan dan tidak dapat diubah lewat koreksi.']);
+            }
+
+            $meta = $kode === JenisDokumenMuk::AK_02
+                ? $this->sinkronKoreksiRekomendasi($penilaian, $penerbitan, $rekomendasiSebelum, Ak02Handler::keputusan($d)['rekomendasi'], $alasan, $pelaku)
+                : [];
+
+            $perubahan = self::bandingkan($sebelum, $this->jejakIsi($d, $handler));
+            $this->catat($d, 'dikoreksi_admin', $d->status, $d->status, $pelaku, $alasan, [
+                ...$meta,
+                'jumlah_perubahan' => count($perubahan),
+                'perubahan' => array_slice($perubahan, 0, self::MAKS_JEJAK_KOREKSI),
+            ]);
+
+            return [$d, $perubahan];
+        });
+
+        foreach ($hapusNanti as [$disk, $path]) {
+            Storage::disk($disk)->delete($path);
+        }
+        if ($perubahan !== []) {
+            $this->notifikasi->setelahDikoreksi($hasil, $alasan, count($perubahan));
+        }
+
+        return [$hasil, count($perubahan)];
+    }
+
+    /**
+     * Rekomendasi FR.AK.02 dikoreksi setelah penilaian selesai -> status penilaian & hasil penerbitan ikut.
+     *
+     * @return array<string, string> meta riwayat
+     */
+    private function sinkronKoreksiRekomendasi(PenilaianMuk $penilaian, ?PenerbitanSertifikasi $penerbitan, ?string $lama, ?string $baru, string $alasan, User $pelaku): array
+    {
+        $selesai = [PenilaianMuk::STATUS_SELESAI_KOMPETEN, PenilaianMuk::STATUS_SELESAI_BELUM_KOMPETEN];
+        if ($lama === $baru || $baru === null || ! in_array($penilaian->status, $selesai, true)) {
+            return [];
+        }
+        if ($penerbitan && $baru !== PenerbitanSertifikasi::KOMPETEN && $penerbitan->sertifikat()->exists()) {
+            throw ValidationException::withMessages(['isian.rekomendasi' => 'Data E-Sertifikat sudah diisi di CMS; rekomendasi tidak dapat diubah menjadi belum kompeten.']);
+        }
+
+        $status = $baru === 'kompeten' ? PenilaianMuk::STATUS_SELESAI_KOMPETEN : PenilaianMuk::STATUS_SELESAI_BELUM_KOMPETEN;
+        $penilaian->update(['status' => $status]);
+        if ($penerbitan) {
+            $penerbitan->update(['hasil' => $baru === 'kompeten' ? PenerbitanSertifikasi::KOMPETEN : PenerbitanSertifikasi::BELUM_KOMPETEN]);
+            RiwayatPenerbitanSertifikasi::create([
+                'penerbitan_sertifikasi_id' => $penerbitan->id,
+                'aksi' => 'hasil_dikoreksi',
+                'keterangan' => 'Hasil diubah lewat koreksi FR.AK.02: '.$alasan,
+                'meta' => ['dari' => $lama, 'ke' => $baru],
+                'user_id' => $pelaku->getKey(),
+            ]);
+        }
+
+        return ['hasil' => $status];
+    }
+
+    /** Isi dokumen dalam bentuk datar untuk dibandingkan (APL.02 tersimpan di tabel jawaban). */
+    private function jejakIsi(DokumenPenilaian $d, DokumenHandler $handler): array
+    {
+        if ($handler instanceof Apl02Handler) {
+            return $d->apl02Jawaban()->with('bukti')->get()->mapWithKeys(fn ($j) => ['elemen_'.$j->elemen_kompetensi_id => [
+                'kompeten' => $j->kompeten,
+                'bukti' => $j->bukti->map(fn ($b) => $b->link ?? $b->nama_file_asli ?? ('lampiran #'.$b->apl01_bukti_relevan_id))->values()->all(),
+            ]])->all();
+        }
+
+        return $d->data ?? [];
+    }
+
+    /**
+     * Daftar field yang berbeda: [{field, sebelum, sesudah}] (nilai teks dipotong agar riwayat tetap ringkas).
+     *
+     * @return array<int, array{field: string, sebelum: mixed, sesudah: mixed}>
+     */
+    private static function bandingkan(array $sebelum, array $sesudah): array
+    {
+        $a = Arr::dot($sebelum);
+        $b = Arr::dot($sesudah);
+        $ringkas = fn ($v) => is_string($v) && mb_strlen($v) > 300 ? mb_substr($v, 0, 300).'...' : ($v === [] ? null : $v);
+        $hasil = [];
+        foreach (array_unique([...array_keys($a), ...array_keys($b)]) as $k) {
+            $x = $ringkas($a[$k] ?? null);
+            $y = $ringkas($b[$k] ?? null);
+            if ($x !== $y) {
+                $hasil[] = ['field' => (string) $k, 'sebelum' => $x, 'sesudah' => $y];
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
      * Status penilaian mengikuti dokumen APL (aturan bagian 6.6):
      * - kedua APL sudah dikirim -> menunggu_review,
      * - salah satu APL dikembalikan untuk revisi -> kembali menunggu_pengisian_apl.
@@ -547,6 +691,23 @@ class DokumenWorkflow
         $this->catat($ak02, 'penilaian_selesai', $ak02->status, $ak02->status, $pelaku, null, ['hasil' => $penilaian->status]);
         // Jadwal & pendaftaran (CMS / website utama) ikut selesai.
         $this->sinkronAsesmen->selesai($penilaian);
+    }
+
+    /**
+     * Kekurangan dokumen sebelum dapat dikirim: [field => pesan] (kosong = siap kirim).
+     * Satu sumber aturan untuk submit() dan untuk ditampilkan ke pengisi (DokumenPenilaianResource),
+     * sehingga yang ditandai di form selalu sama dengan yang ditolak saat Kirim.
+     *
+     * @return array<string, string>
+     */
+    public function kekuranganKirim(DokumenPenilaian $d, DokumenHandler $handler): array
+    {
+        $errors = $handler->kesalahanSubmit($d);
+        if ($handler->butuhTandaTangan() && ! $this->ttd->ada($d->{self::kolomTtd($handler->pengisi())[0]})) {
+            $errors['tanda_tangan'] = 'Tanda tangani dokumen sebelum mengirim.';
+        }
+
+        return $errors;
     }
 
     /** [kolom path, kolom tanggal] tanda tangan untuk pihak tsb. */

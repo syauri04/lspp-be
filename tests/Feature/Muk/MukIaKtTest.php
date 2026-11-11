@@ -126,9 +126,12 @@ describe('FR.IA.04B', function () {
         $this->withToken($token)->getJson($url)->assertJsonPath('data.isian.aspek.0.pertanyaan', 'Jelaskan koordinasi?');
 
         $this->withToken($token)->postJson("{$url}/tanda-tangan", ['tanda_tangan' => pngDataUrl()])->assertOk();
-        $this->withToken($token)->postJson("{$url}/submit")->assertJsonValidationErrors('isian.rekomendasi');
+        $this->withToken($token)->postJson("{$url}/submit")->assertJsonValidationErrors(['isian.rekomendasi', 'isian.judul_kegiatan']);
+        $this->withToken($token)->patchJson($url, ['isian' => ['judul_kegiatan' => str_repeat('x', 501)]])->assertJsonValidationErrors('isian.judul_kegiatan');
 
-        $this->withToken($token)->patchJson($url, ['isian' => ['rekomendasi' => 'belum_kompeten', 'rekomendasi_teks' => 'Perlu pendalaman risiko']])->assertOk();
+        $this->withToken($token)->patchJson($url, ['isian' => ['judul_kegiatan' => '  Presentasi Rencana Proyek  ', 'rekomendasi' => 'belum_kompeten', 'rekomendasi_teks' => 'Perlu pendalaman risiko']])
+            ->assertOk()
+            ->assertJsonPath('data.isian.judul_kegiatan', 'Presentasi Rencana Proyek');
         kirimKt($this, $url, $token, $tokenAsesi);
 
         // Hasil belum tercapai IA.04B tampil sebagai indikasi di AK.02.

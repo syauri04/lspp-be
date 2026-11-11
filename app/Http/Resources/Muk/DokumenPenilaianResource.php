@@ -59,6 +59,18 @@ class DokumenPenilaianResource extends JsonResource
                     'bisa_siapkan' => Gate::allows('siapkan', $d),
                     'bisa_nilai' => Gate::allows('nilai', $d),
                 ]),
+                // Hanya untuk pengisi pada draft (sudah pernah disimpan): bagian yang belum lengkap
+                // sebelum Kirim, dengan aturan yang sama persis seperti saat submit.
+                'kekurangan' => $this->when(
+                    $d->status === DokumenPenilaian::STATUS_DRAFT && Gate::allows('isi', $d),
+                    fn () => (object) app(DokumenWorkflow::class)->kekuranganKirim($d, $this->handler),
+                ),
+                // Untuk super admin: boleh mengoreksi isi dokumen terkirim? (alasan bila tidak)
+                'koreksi' => $this->when($this->peran === 'admin', function () use ($d) {
+                    $hasil = Gate::inspect('koreksi', $d);
+
+                    return ['bisa' => $hasil->allowed(), 'alasan' => $hasil->allowed() ? null : $hasil->message()];
+                }),
                 'dapat_ditarik' => $this->handler->penyetuju() !== null && Gate::allows('tarik', $d),
                 'tanda_tangan' => collect(TandaTanganService::PIHAK)->mapWithKeys(function (string $pihak) use ($d) {
                     [$path, $tanggal] = DokumenWorkflow::kolomTtd($pihak);

@@ -30,8 +30,9 @@ class PendaftaranSertifikasi extends Model
     /** Kelompok tab filter di profil -> status yang termasuk. */
     public const KELOMPOK = [
         'diajukan' => ['submitted'],
-        'diproses' => ['approved', 'awaiting_payment', 'paid', 'dijadwalkan'],
-        'selesai' => ['asesmen_selesai', 'completed'],
+        // asesmen_selesai: asesmen MUK selesai, SK / e-sertifikat belum diterbitkan LSP.
+        'diproses' => ['approved', 'awaiting_payment', 'paid', 'dijadwalkan', 'asesmen_selesai'],
+        'selesai' => ['completed'],
         'ditolak' => ['rejected', 'expired', 'cancelled'],
     ];
 
@@ -94,6 +95,12 @@ class PendaftaranSertifikasi extends Model
     public function pembayaran(): HasOne
     {
         return $this->hasOne(Pembayaran::class);
+    }
+
+    /** Proses penerbitan sertifikat setelah asesmen MUK selesai. */
+    public function penerbitanSertifikasi(): HasOne
+    {
+        return $this->hasOne(PenerbitanSertifikasi::class);
     }
 
     public function reviewer(): BelongsTo

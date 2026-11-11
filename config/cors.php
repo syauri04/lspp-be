@@ -30,7 +30,8 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Nama berkas unduhan (SK / e-sertifikat) dibaca FE dari header ini.
+    'exposed_headers' => ['Content-Disposition'],
 
     'max_age' => 3600,
 

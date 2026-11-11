@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\PendaftaranSertifikasi;
+use App\Models\PenilaianMuk;
 use App\Models\RiwayatStatusPendaftaran;
 use App\Notifications\StatusPendaftaranNotifikasi;
 use App\Support\Cms\NotifikasiAdmin;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Log;
  */
 class RiwayatStatusPendaftaranObserver
 {
-    public const STATUS = ['submitted', 'paid', 'expired', 'asesmen_selesai'];
+    public const STATUS = ['submitted', 'paid', 'expired', 'asesmen_selesai', 'completed'];
 
     public function created(RiwayatStatusPendaftaran $riwayat): void
     {
@@ -55,9 +56,11 @@ class RiwayatStatusPendaftaranObserver
             ),
             'asesmen_selesai' => NotifikasiAdmin::pemberitahuan(
                 'asesmen',
-                'Asesmen selesai',
-                "Asesmen {$nama} untuk skema {$skema} telah selesai.",
-                $pendaftaran->jadwalAsesmen ? route('asesmen.show', $pendaftaran->jadwalAsesmen) : route('asesmen.index'),
+                'Asesmen selesai, sertifikat perlu diproses',
+                "Asesmen {$nama} untuk skema {$skema} telah selesai. Unggah SK".($pendaftaran->penilaianMuk?->status === PenilaianMuk::STATUS_SELESAI_KOMPETEN ? ' dan e-sertifikat.' : '.'),
+                ($penerbitan = $pendaftaran->penerbitanSertifikasi()->first())
+                    ? route('penerbitan-sertifikat.show', $penerbitan)
+                    : ($pendaftaran->jadwalAsesmen ? route('asesmen.show', $pendaftaran->jadwalAsesmen) : route('asesmen.index')),
             ),
             default => null,
         };

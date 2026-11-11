@@ -8,7 +8,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * FR.AK.03 Umpan Balik dan Catatan Asesmen — diisi ASESI setelah keputusan (AK.02 selesai).
- * Asesi menilai 9 komponen (Ya/Tidak + catatan) lalu mengirim (tanpa tanda tangan) -> selesai.
+ * Asesi menilai 10 komponen (Ya/Tidak + catatan) lalu mengirim (tanpa tanda tangan) -> selesai.
  * Header (TUK, tanggal mulai/selesai) mengikuti AK.02. Asesor dapat membaca setelah dikirim.
  *
  * Isian: { komponen: [{ hasil: ya|tidak|null, catatan }], catatan_lainnya }
@@ -24,6 +24,8 @@ class Ak03Handler extends PenutupHandler
         'Saya mendapatkan penjelasan yang memadai mengenai keputusan asesmen',
         'Asesor memberikan umpan balik yang mendukung setelah asesmen serta tindak lanjutnya',
         'Asesor bersama saya mempelajari semua dokumen asesmen serta menandatanganinya',
+        // Butir ke-9 (sesuai formulir asli). Data lama digeser oleh migrasi 2026_11_12_100000.
+        'Saya mendapatkan jaminan kerahasiaan hasil asesmen serta penjelasan penanganan dokumen asesmen',
         'Asesor menggunakan keterampilan komunikasi yang efektif selama asesmen',
     ];
 

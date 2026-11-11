@@ -2,6 +2,7 @@
 
 namespace App\Services\Muk\Dokumen;
 
+use App\Models\Apl01BuktiRelevan;
 use App\Models\Apl02BuktiRelevan;
 use App\Models\Apl02Jawaban;
 use App\Models\DokumenPenilaian;
@@ -20,7 +21,9 @@ use Illuminate\Validation\ValidationException;
  * - Jawaban per ELEMEN di apl02_jawabans: kompeten (K/BK). Baris jawaban TIDAK dibuat di muka;
  *   GET menggabungkan master unit->elemen->KUK dengan jawaban.
  * - "Bukti yang relevan" per elemen di apl02_bukti_relevans: tiap baris berisi berkas unggahan,
- *   link (http/https), atau keduanya. Elemen K wajib punya minimal satu bukti terisi.
+ *   link (http/https), dan/atau rujukan "Lampiran bukti yang relevan" FR.APL.01 (bagian 3) milik
+ *   penilaian yang sama (apl01_bukti_relevan_id; hanya lampiran yang berisi berkas/link).
+ *   Elemen K wajib punya minimal satu bukti terisi.
  * - Struktur unit/elemen/KUK dibekukan ke snapshot saat submit.
  * - Bagian rekomendasi (asesor) read-only di sini; diisi lewat review asesor.
  */
@@ -67,7 +70,7 @@ class Apl02Handler implements DokumenHandler
 
         $penilaian = $dokumen->penilaianMuk;
         $master = $dokumen->snapshot ?? $this->master($this->skema($dokumen));
-        $jawaban = $dokumen->apl02Jawaban()->with('bukti')->get()->keyBy('elemen_kompetensi_id');
+        $jawaban = $dokumen->apl02Jawaban()->with('bukti.lampiranApl01')->get()->keyBy('elemen_kompetensi_id');
         $asesor = $dokumen->ditinjauOlehAsesor ?? $penilaian->jadwalAsesmen?->asesor;
 
         $units = collect($master['unit_kompetensi'])->map(fn (array $u) => [
@@ -82,6 +85,7 @@ class Apl02Handler implements DokumenHandler
                         'bukti' => ($j?->bukti ?? collect())->map(fn (Apl02BuktiRelevan $b) => [
                             'id' => $b->id,
                             'link' => $b->link,
+                            'lampiran' => $b->lampiranApl01 ? Apl01Handler::barisRelevan($b->lampiranApl01) : null,
                             'file' => $b->path_file ? [
                                 'nama' => $b->nama_file_asli,
                                 'mime' => $b->mime_type,
@@ -109,6 +113,8 @@ class Apl02Handler implements DokumenHandler
                 'rekomendasi' => $dokumen->hasil_rekomendasi_asesor,
                 'catatan' => $dokumen->catatan_asesor,
             ],
+            // Pilihan dropdown "Pilih dari Lampiran FR.APL.01" (kosong bila asesi belum melampirkan apa pun).
+            'lampiran_apl01' => $this->lampiranApl01($dokumen)->map(fn (Apl01BuktiRelevan $b) => Apl01Handler::barisRelevan($b))->values()->all(),
             'batas' => [
                 'maks_bukti_per_elemen' => self::MAKS_BUKTI_PER_ELEMEN,
                 'mimes' => self::BUKTI_MIMES,
@@ -126,8 +132,10 @@ class Apl02Handler implements DokumenHandler
             'jawaban.*.elemen_id' => ['required', 'integer', 'distinct', Rule::in($this->idElemen($dokumen)->all())],
             'jawaban.*.kompeten' => ['present', 'nullable', Rule::in(['K', 'BK'])],
             'jawaban.*.bukti' => ['present', 'array', 'max:'.self::MAKS_BUKTI_PER_ELEMEN],
-            'jawaban.*.bukti.*' => ['array:id,link'],
+            'jawaban.*.bukti.*' => ['array:id,link,lampiran_id'],
             'jawaban.*.bukti.*.id' => ['nullable', 'integer'],
+            // Kepemilikan lampiran (penilaian yang sama, berisi) dicek di simpan().
+            'jawaban.*.bukti.*.lampiran_id' => ['nullable', 'integer'],
             // Hanya http/https: mencegah link "javascript:" dsb.
             'jawaban.*.bukti.*.link' => ['nullable', 'string', 'max:2048', 'url:http,https'],
         ];
@@ -142,6 +150,7 @@ class Apl02Handler implements DokumenHandler
     {
         $semua = $dokumen->apl02Jawaban()->with('bukti')->get()->keyBy('elemen_kompetensi_id');
         $berubah = false;
+        $lampiranSah = $this->lampiranApl01($dokumen)->pluck('id')->all();
 
         foreach ($validated['jawaban'] as $item) {
             $kompeten = $item['kompeten'] ?? null;
@@ -154,7 +163,16 @@ class Apl02Handler implements DokumenHandler
                 throw ValidationException::withMessages(['jawaban' => ['Data bukti tidak valid. Muat ulang halaman lalu coba lagi.']]);
             }
 
-            $adaBuktiBaru = $buktiKirim->contains(fn ($b) => empty($b['id']) && filled($b['link'] ?? null));
+            // Lampiran FR.APL.01: harus milik penilaian ini & berisi; satu lampiran sekali per elemen.
+            $lampiranKirim = $buktiKirim->pluck('lampiran_id')->filter()->map(fn ($id) => (int) $id);
+            if ($lampiranKirim->diff($lampiranSah)->isNotEmpty()) {
+                throw ValidationException::withMessages(['jawaban' => ['Lampiran FR.APL.01 yang dipilih tidak tersedia. Muat ulang halaman lalu coba lagi.']]);
+            }
+            if ($lampiranKirim->duplicates()->isNotEmpty()) {
+                throw ValidationException::withMessages(['jawaban' => ['Lampiran FR.APL.01 yang sama dipilih lebih dari sekali pada satu elemen.']]);
+            }
+
+            $adaBuktiBaru = $buktiKirim->contains(fn ($b) => empty($b['id']) && (filled($b['link'] ?? null) || ! empty($b['lampiran_id'])));
             if (! $jawaban && $kompeten === null && ! $adaBuktiBaru) {
                 continue; // tidak perlu membuat baris kosong
             }
@@ -174,13 +192,14 @@ class Apl02Handler implements DokumenHandler
             $idDipertahankan = [];
             foreach ($buktiKirim->values() as $urutan => $b) {
                 $link = filled($b['link'] ?? null) ? trim($b['link']) : null;
+                $lampiranId = ! empty($b['lampiran_id']) ? (int) $b['lampiran_id'] : null;
                 $row = ! empty($b['id']) ? $buktiLama->get($b['id']) : null;
 
                 if (! $row) {
-                    if ($link === null) {
+                    if ($link === null && $lampiranId === null) {
                         continue;
                     }
-                    $jawaban->bukti()->create(['link' => $link, 'urutan' => $urutan]);
+                    $jawaban->bukti()->create(['link' => $link, 'apl01_bukti_relevan_id' => $lampiranId, 'urutan' => $urutan]);
                     $berubah = true;
 
                     continue;
@@ -188,17 +207,17 @@ class Apl02Handler implements DokumenHandler
 
                 $idDipertahankan[] = $row->id;
 
-                // Baris tanpa link & tanpa berkas = kosong -> dihapus.
-                if ($link === null && ! $row->path_file) {
+                // Baris tanpa link, berkas, dan lampiran = kosong -> dihapus.
+                if ($link === null && $lampiranId === null && ! $row->path_file) {
                     $row->delete();
                     $berubah = true;
 
                     continue;
                 }
 
-                if ($row->link !== $link || $row->urutan !== $urutan) {
-                    $row->update(['link' => $link, 'urutan' => $urutan]);
-                    $berubah = $berubah || $row->wasChanged('link');
+                if ($row->link !== $link || $row->apl01_bukti_relevan_id !== $lampiranId || $row->urutan !== $urutan) {
+                    $row->update(['link' => $link, 'apl01_bukti_relevan_id' => $lampiranId, 'urutan' => $urutan]);
+                    $berubah = $berubah || $row->wasChanged(['link', 'apl01_bukti_relevan_id']);
                 }
             }
 
@@ -277,7 +296,7 @@ class Apl02Handler implements DokumenHandler
 
         $hapusNanti[] = [self::disk(), $row->path_file];
 
-        if (filled($row->link)) {
+        if (filled($row->link) || $row->apl01_bukti_relevan_id !== null) {
             $row->update(['path_file' => null, 'nama_file_asli' => null, 'mime_type' => null, 'ukuran_file' => null]);
         } else {
             $row->delete();
@@ -299,6 +318,21 @@ class Apl02Handler implements DokumenHandler
         return $this->idElemen($dokumen)->contains($elemenId);
     }
 
+    /**
+     * Lampiran bukti yang relevan FR.APL.01 penilaian ini yang berisi berkas/link
+     * (urut template lalu tambahan asesi). Kosong bila tidak ada / APL.01 belum dibuat.
+     *
+     * @return Collection<int, Apl01BuktiRelevan>
+     */
+    public function lampiranApl01(DokumenPenilaian $dokumen): Collection
+    {
+        $apl01 = $dokumen->penilaianMuk->dokumenPenilaian()->kode(JenisDokumenMuk::APL_01)->first();
+
+        return $apl01
+            ? $apl01->buktiRelevan()->get()->filter(fn (Apl01BuktiRelevan $b) => $b->terisi())->values()
+            : collect();
+    }
+
     public static function disk(): string
     {
         return config('muk.tanda_tangan.disk');
@@ -308,7 +342,7 @@ class Apl02Handler implements DokumenHandler
 
     public function kesalahanSubmit(DokumenPenilaian $dokumen): array
     {
-        $jawaban = $dokumen->apl02Jawaban()->with('bukti')->get()->keyBy('elemen_kompetensi_id');
+        $jawaban = $dokumen->apl02Jawaban()->with('bukti.lampiranApl01')->get()->keyBy('elemen_kompetensi_id');
         $errors = [];
 
         foreach ($this->idElemen($dokumen) as $id) {
@@ -316,7 +350,7 @@ class Apl02Handler implements DokumenHandler
             if (! $row?->kompeten) {
                 $errors["jawaban.{$id}"] = 'Pilih K atau BK.';
             } elseif ($row->kompeten === 'K' && $row->bukti->filter->terisi()->isEmpty()) {
-                $errors["jawaban.{$id}"] = 'Unggah dokumen atau sisipkan link minimal satu bukti.';
+                $errors["jawaban.{$id}"] = 'Unggah dokumen, sisipkan link, atau pilih lampiran FR.APL.01 minimal satu bukti.';
             }
         }
 

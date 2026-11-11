@@ -16,6 +16,7 @@ use Illuminate\Notifications\Notification;
  *  - paid            : pembayaran berhasil, menunggu jadwal asesmen
  *  - expired         : batas waktu pembayaran lewat
  *  - asesmen_selesai : hasil asesmen (kompeten / belum kompeten) dari MUK
+ *  - completed       : sertifikasi selesai (SK hasil uji / e-sertifikat dapat diunduh di profil)
  * Payload database mengikuti format standar notifikasi asesi (NotifikasiAsesiResource).
  */
 class StatusPendaftaranNotifikasi extends Notification implements ShouldQueue
@@ -58,7 +59,7 @@ class StatusPendaftaranNotifikasi extends Notification implements ShouldQueue
         $isi = $this->isi();
 
         return [
-            'kategori' => $this->status === 'asesmen_selesai' ? 'asesmen' : ($this->status === 'submitted' ? 'pendaftaran' : 'pembayaran'),
+            'kategori' => in_array($this->status, ['asesmen_selesai', 'completed'], true) ? 'asesmen' : ($this->status === 'submitted' ? 'pendaftaran' : 'pembayaran'),
             'judul' => $isi['judul'],
             'pesan' => $isi['pesan'],
             'skema' => $this->skema(),
@@ -99,6 +100,7 @@ class StatusPendaftaranNotifikasi extends Notification implements ShouldQueue
                 'tombol' => 'Lihat Skema Sertifikasi',
                 'url' => '/sertifikasi',
             ],
+            'completed' => $this->isiSelesai($skema, $profil),
             default => $this->isiHasil($skema, $profil),
         };
     }
@@ -117,6 +119,21 @@ class StatusPendaftaranNotifikasi extends Notification implements ShouldQueue
             'pesan' => "Asesmen {$skema} telah selesai. Anda dinyatakan {$hasil}. {$lanjut}",
             'baris' => ["Asesmen {$skema} telah selesai.", "Hasil: Anda dinyatakan {$hasil}.", $lanjut],
             'tombol' => 'Lihat Hasil',
+            'url' => $profil,
+        ];
+    }
+
+    private function isiSelesai(string $skema, string $profil): array
+    {
+        $kompeten = $this->pendaftaran->penilaianMuk?->status === PenilaianMuk::STATUS_SELESAI_KOMPETEN;
+        $unduh = $kompeten ? 'SK hasil uji dan e-sertifikat' : 'SK hasil uji';
+
+        return [
+            'judul' => $kompeten ? 'Sertifikat terbit' : 'Sertifikasi selesai',
+            'subjek' => $kompeten ? 'E-Sertifikat Kompetensi Anda Telah Terbit' : 'Proses Sertifikasi Anda Telah Selesai',
+            'pesan' => "Proses sertifikasi {$skema} telah selesai. {$unduh} dapat diunduh di halaman profil.",
+            'baris' => ["Proses sertifikasi {$skema} telah selesai.", "{$unduh} dapat diunduh di halaman profil Anda."],
+            'tombol' => 'Lihat di Profil',
             'url' => $profil,
         ];
     }

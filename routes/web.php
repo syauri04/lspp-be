@@ -4,6 +4,7 @@ use App\Http\Controllers\CMS\AboutPageController;
 use App\Http\Controllers\CMS\AsesiController;
 use App\Http\Controllers\CMS\AsesmenController;
 use App\Http\Controllers\CMS\AsesorController;
+use App\Http\Controllers\CMS\BukaMukController;
 use App\Http\Controllers\CMS\CalendarController;
 use App\Http\Controllers\CMS\CategorySkemaSertifikasiController;
 use App\Http\Controllers\CMS\DivisionController;
@@ -16,16 +17,17 @@ use App\Http\Controllers\CMS\MemberController;
 use App\Http\Controllers\CMS\MitraController;
 use App\Http\Controllers\CMS\NewsArticleController;
 use App\Http\Controllers\CMS\NewsCategoryController;
-use App\Http\Controllers\CMS\PendaftaranSertifikasiController;
-use App\Http\Controllers\CMS\PengaturanPembayaranController;
 use App\Http\Controllers\CMS\NotifikasiController;
-use App\Http\Controllers\CMS\VoucherController;
+use App\Http\Controllers\CMS\PendaftaranSertifikasiController;
+use App\Http\Controllers\CMS\PenerbitanSertifikatController;
+use App\Http\Controllers\CMS\PengaturanPembayaranController;
 use App\Http\Controllers\CMS\PenjadwalanAsesmenController;
 use App\Http\Controllers\CMS\ReviewApl01Controller;
 use App\Http\Controllers\CMS\SkemaSertifikasiController;
 use App\Http\Controllers\CMS\TinyMceController;
 use App\Http\Controllers\CMS\TUKController;
 use App\Http\Controllers\CMS\VerifikasiPembayaranController;
+use App\Http\Controllers\CMS\VoucherController;
 use App\Http\Controllers\DokumenPendaftaranController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,6 +83,26 @@ Route::middleware(['auth'])->group(function () {
 
     // Voucher potongan biaya sertifikasi (dipakai asesi di checkout)
     Route::resource('vouchers', VoucherController::class);
+
+    // Super admin membuka penilaian di MUK (baca & cetak dokumen).
+    Route::post('muk/{penilaian}/buka', BukaMukController::class)->whereNumber('penilaian')
+        ->middleware('throttle:20,1,cms-buka-muk')->name('muk.buka');
+
+    // Penerbitan sertifikat (SK & e-sertifikat) setelah asesmen MUK selesai.
+    // Lihat: semua user CMS. Ubah: super admin (Gate kelola-sertifikasi, dicek di controller).
+    Route::prefix('penerbitan-sertifikat')->name('penerbitan-sertifikat.')->whereNumber('penerbitan')->group(function () {
+        Route::get('/', [PenerbitanSertifikatController::class, 'index'])->name('index');
+        Route::get('/{penerbitan}', [PenerbitanSertifikatController::class, 'show'])->name('show');
+        Route::post('/{penerbitan}/dokumen/{jenis}', [PenerbitanSertifikatController::class, 'unggahDokumen'])
+            ->where('jenis', '[a-z_]+')->middleware('throttle:30,1,cms-sertifikasi-unggah')->name('dokumen.unggah');
+        Route::get('/{penerbitan}/dokumen/{jenis}', [PenerbitanSertifikatController::class, 'berkasDokumen'])
+            ->where('jenis', '[a-z_]+')->name('dokumen.berkas');
+        Route::post('/{penerbitan}/sertifikat', [PenerbitanSertifikatController::class, 'simpanSertifikat'])
+            ->middleware('throttle:30,1,cms-sertifikasi-unggah')->name('sertifikat.simpan');
+        Route::get('/{penerbitan}/sertifikat', [PenerbitanSertifikatController::class, 'berkasSertifikat'])->name('sertifikat.berkas');
+        Route::post('/{penerbitan}/sertifikat/status', [PenerbitanSertifikatController::class, 'ubahStatusSertifikat'])->name('sertifikat.status');
+        Route::post('/{penerbitan}/selesaikan', [PenerbitanSertifikatController::class, 'selesaikan'])->name('selesaikan');
+    });
 
     // Asesmen
     Route::prefix('asesmen')->name('asesmen.')->group(function () {

@@ -263,3 +263,124 @@ it('GET tidak N+1: jumlah query tetap walau elemen bertambah', function () {
 
     expect($hitung())->toBe($awal);
 });
+
+describe('bukti dari Lampiran FR.APL.01', function () {
+    /** Lampiran APL.01 penilaian: 1 berkas, 1 link, 1 kosong (tidak boleh muncul di pilihan). */
+    function lampiranApl01(PenilaianMuk $p): array
+    {
+        $apl01 = $p->dokumenPenilaian()->kode(JenisDokumenMuk::APL_01)->first();
+
+        return [
+            $apl01->buktiRelevan()->create(['nama' => 'Laporan kegiatan', 'path_file' => 'apl01/x/laporan.pdf', 'nama_file_asli' => 'laporan.pdf', 'mime_type' => 'application/pdf']),
+            $apl01->buktiRelevan()->create(['nama' => 'Sertifikat pelatihan', 'link' => 'https://contoh.id/sertifikat']),
+            $apl01->buktiRelevan()->create(['nama' => 'Butir kosong']),
+        ];
+    }
+
+    it('GET menampilkan pilihan lampiran APL.01 yang berisi saja; kosong bila tidak ada', function () {
+        [, $p, $token] = siapkanApl02();
+
+        $this->withToken($token)->getJson(apl02Url($p))->assertOk()->assertJsonPath('data.lampiran_apl01', []);
+
+        [$laporan, $sertifikat] = lampiranApl01($p);
+        $this->withToken($token)->getJson(apl02Url($p))
+            ->assertOk()
+            ->assertJsonCount(2, 'data.lampiran_apl01')
+            ->assertJsonPath('data.lampiran_apl01.0.id', $laporan->id)
+            ->assertJsonPath('data.lampiran_apl01.1.nama', 'Sertifikat pelatihan');
+    });
+
+    it('PATCH memilih lampiran sebagai bukti; elemen K dengan lampiran saja bisa dikirim', function () {
+        [, $p, $token] = siapkanApl02();
+        [$laporan, $sertifikat] = lampiranApl01($p);
+
+        $jawaban = collect(elemenIds($p))->map(fn ($id) => [
+            'elemen_id' => $id, 'kompeten' => 'K',
+            'bukti' => [['id' => null, 'link' => null, 'lampiran_id' => $laporan->id]],
+        ])->all();
+
+        $this->withToken($token)->patchJson(apl02Url($p), ['jawaban' => $jawaban])
+            ->assertOk()
+            ->assertJsonPath('data.unit_kompetensi.0.elemen.0.jawaban.bukti.0.lampiran.id', $laporan->id)
+            ->assertJsonPath('data.unit_kompetensi.0.elemen.0.jawaban.bukti.0.lampiran.nama', 'Laporan kegiatan')
+            ->assertJsonPath('data.unit_kompetensi.0.elemen.0.jawaban.bukti.0.link', null);
+
+        expect(Apl02BuktiRelevan::whereNotNull('apl01_bukti_relevan_id')->count())->toBe(count($jawaban));
+
+        $this->withToken($token)->postJson(apl02Url($p, '/tanda-tangan'), ['tanda_tangan' => pngDataUrl()])->assertOk();
+        $this->withToken($token)->postJson(apl02Url($p, '/submit'))->assertOk()
+            ->assertJsonPath('data.dokumen.status', DokumenPenilaian::STATUS_MENUNGGU_REVIEW);
+    });
+
+    it('menolak lampiran milik penilaian lain, lampiran kosong, dan lampiran ganda di satu elemen', function () {
+        [, $p, $token] = siapkanApl02();
+        [$laporan, , $kosong] = lampiranApl01($p);
+        [, $lain] = siapkanApl02();
+        [$milikLain] = lampiranApl01($lain);
+        $e1 = elemenIds($p)[0];
+
+        foreach ([$milikLain->id, $kosong->id] as $id) {
+            $this->withToken($token)->patchJson(apl02Url($p), ['jawaban' => [
+                ['elemen_id' => $e1, 'kompeten' => 'K', 'bukti' => [['id' => null, 'link' => null, 'lampiran_id' => $id]]],
+            ]])->assertStatus(422)->assertJsonValidationErrors('jawaban');
+        }
+
+        $this->withToken($token)->patchJson(apl02Url($p), ['jawaban' => [
+            ['elemen_id' => $e1, 'kompeten' => 'K', 'bukti' => [
+                ['id' => null, 'link' => null, 'lampiran_id' => $laporan->id],
+                ['id' => null, 'link' => null, 'lampiran_id' => $laporan->id],
+            ]],
+        ]])->assertStatus(422)->assertJsonValidationErrors('jawaban');
+
+        expect(Apl02BuktiRelevan::count())->toBe(0);
+    });
+
+    it('lampiran APL.01 dihapus: rujukan menjadi kosong, elemen K kembali wajib bukti', function () {
+        [, $p, $token] = siapkanApl02();
+        [$laporan] = lampiranApl01($p);
+        $e1 = elemenIds($p)[0];
+
+        $this->withToken($token)->patchJson(apl02Url($p), ['jawaban' => [
+            ['elemen_id' => $e1, 'kompeten' => 'K', 'bukti' => [['id' => null, 'link' => null, 'lampiran_id' => $laporan->id]]],
+        ]])->assertOk();
+
+        $laporan->delete();
+        $bukti = Apl02BuktiRelevan::sole();
+        expect($bukti->apl01_bukti_relevan_id)->toBeNull()->and($bukti->terisi())->toBeFalse();
+    });
+});
+
+describe('kekurangan sebelum kirim (ditampilkan di form)', function () {
+    it('tidak ada sebelum disimpan; setelah simpan berisi elemen yang belum lengkap & tanda tangan', function () {
+        [, $p, $token] = siapkanApl02();
+        [$e1, $e2] = elemenIds($p);
+
+        $this->withToken($token)->getJson(apl02Url($p))->assertOk()->assertJsonMissingPath('data.dokumen.kekurangan');
+
+        $res = $this->withToken($token)->patchJson(apl02Url($p), ['jawaban' => [
+            ['elemen_id' => $e1, 'kompeten' => 'K', 'bukti' => []],
+            ['elemen_id' => $e2, 'kompeten' => 'BK', 'bukti' => []],
+        ]])->assertOk();
+
+        expect($res->json('data.dokumen.kekurangan'))
+            ->toHaveKey("jawaban.{$e1}", 'Unggah dokumen, sisipkan link, atau pilih lampiran FR.APL.01 minimal satu bukti.')
+            ->not->toHaveKey("jawaban.{$e2}")
+            ->toHaveKey('tanda_tangan', 'Tanda tangani dokumen sebelum mengirim.');
+    });
+
+    it('kosong ({}) saat sudah lengkap; tidak ada untuk asesor maupun setelah dikirim', function () {
+        $asesor = Asesor::factory()->create();
+        [, $p, $token] = siapkanApl02($asesor);
+        $this->withToken($token)->patchJson(apl02Url($p), ['jawaban' => jawabSemua($p)]);
+        $res = $this->withToken($token)->postJson(apl02Url($p, '/tanda-tangan'), ['tanda_tangan' => pngDataUrl()])->assertOk();
+        expect($res->json('data.dokumen.kekurangan'))->toBe([]);
+
+        app('auth')->forgetGuards();
+        $this->withToken(MukFixture::token($asesor))->getJson(apl02Url($p))
+            ->assertJsonMissingPath('data.dokumen.kekurangan');
+
+        app('auth')->forgetGuards();
+        $this->withToken($token)->postJson(apl02Url($p, '/submit'))->assertOk()
+            ->assertJsonMissingPath('data.dokumen.kekurangan');
+    });
+});

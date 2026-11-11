@@ -4,11 +4,16 @@ use App\Models\DokumenPenilaian;
 use App\Models\JadwalAsesmen;
 use App\Models\JenisDokumenMuk;
 use App\Models\PendaftaranSertifikasi;
+use App\Models\PenerbitanSertifikasi;
 use App\Models\PenilaianMuk;
+use App\Models\Sertifikat;
+use App\Models\User;
 use App\Notifications\PengingatAsesmenNotifikasi;
+use App\Notifications\SertifikatAkanKedaluwarsaNotifikasi;
 use App\Services\Muk\Dokumen\Ak02Handler;
 use App\Services\Muk\DokumenWorkflow;
 use App\Services\Pembayaran\KonfirmasiPembayaran;
+use App\Support\Cms\NotifikasiAdmin;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -52,6 +57,43 @@ Artisan::command('asesmen:kirim-pengingat', function () {
 
     $this->info("{$jumlah} pengingat asesmen dikirim.");
 })->purpose('Kirim pengingat asesmen H-3 & H-1 ke asesi');
+
+// Pengingat e-sertifikat akan kedaluwarsa (H-1 bulan, config sertifikasi.pengingat_kedaluwarsa_bulan) ke asesi
+// & admin. Tiap sertifikat sekali saja (kolom pengingat_kedaluwarsa_at diklaim atomik sebelum mengirim);
+// hari yang terlewat (cron mati) tetap terkejar selama belum lewat tanggal kedaluwarsa.
+Schedule::command('sertifikat:kirim-pengingat-kedaluwarsa')->dailyAt('07:00')->timezone('Asia/Jakarta')->withoutOverlapping();
+
+Artisan::command('sertifikat:kirim-pengingat-kedaluwarsa', function () {
+    $hariIni = now(config('muk.zona_waktu'))->startOfDay();
+    $batas = $hariIni->copy()->addMonthsNoOverflow((int) config('sertifikasi.pengingat_kedaluwarsa_bulan', 1));
+    $admin = User::whereHas('roles', fn ($q) => $q->whereIn('name', NotifikasiAdmin::PERAN))->get();
+    $jumlah = 0;
+
+    Sertifikat::query()
+        ->where('status', Sertifikat::BERLAKU)
+        ->whereNull('pengingat_kedaluwarsa_at')
+        ->whereDate('tanggal_expired', '>=', $hariIni->toDateString())
+        ->whereDate('tanggal_expired', '<=', $batas->toDateString())
+        // Hanya sertifikat yang sudah diterbitkan ke asesi (proses penerbitan selesai).
+        ->whereHas('penerbitan', fn ($q) => $q->where('status', PenerbitanSertifikasi::SELESAI))
+        ->with('penerbitan.pendaftaran.asesi')
+        ->chunkById(100, function ($daftar) use ($admin, &$jumlah) {
+            foreach ($daftar as $sertifikat) {
+                // Klaim atomik: proses lain yang berjalan bersamaan tidak akan mengirim dobel.
+                $diklaim = Sertifikat::whereKey($sertifikat->id)->whereNull('pengingat_kedaluwarsa_at')
+                    ->update(['pengingat_kedaluwarsa_at' => now()]);
+                if (! $diklaim) {
+                    continue;
+                }
+                $notifikasi = new SertifikatAkanKedaluwarsaNotifikasi($sertifikat);
+                $sertifikat->penerbitan?->pendaftaran?->asesi?->notify($notifikasi);
+                $admin->each(fn (User $u) => $u->notify($notifikasi));
+                $jumlah++;
+            }
+        });
+
+    $this->info("{$jumlah} pengingat e-sertifikat kedaluwarsa dikirim.");
+})->purpose('Kirim pengingat e-sertifikat akan kedaluwarsa ke asesi & admin');
 
 // KHUSUS LOKAL: tandai pembayaran lunas tanpa DOKU (webhook DOKU sandbox mengarah ke staging, jadi
 // database lokal tidak pernah menerima konfirmasi). Alurnya sama dengan webhook: status, riwayat, notifikasi.

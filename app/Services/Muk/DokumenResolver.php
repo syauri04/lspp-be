@@ -6,6 +6,7 @@ use App\Models\Asesi;
 use App\Models\Asesor;
 use App\Models\DokumenPenilaian;
 use App\Models\PenilaianMuk;
+use App\Models\User;
 use App\Services\Muk\Dokumen\DokumenHandler;
 use App\Services\Muk\Dokumen\DokumenHandlerRegistry;
 
@@ -18,7 +19,7 @@ class DokumenResolver
     public function __construct(private DokumenHandlerRegistry $registry) {}
 
     /** @return array{0: DokumenPenilaian, 1: DokumenHandler} */
-    public function temukan(Asesi|Asesor $user, int $penilaianId, string $slug): array
+    public function temukan(Asesi|Asesor|User $user, int $penilaianId, string $slug): array
     {
         $handler = $this->registry->untukSlug($slug);
         abort_if($handler === null, 404);

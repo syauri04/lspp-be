@@ -3,6 +3,7 @@
 namespace App\Services\Muk;
 
 use App\Models\PenilaianMuk;
+use App\Services\Sertifikasi\PenerbitanSertifikasiService;
 
 /**
  * Menyelaraskan status di luar MUK (jadwal asesmen & pendaftaran sertifikasi, dipakai CMS
@@ -23,6 +24,11 @@ class SinkronStatusAsesmen
         $penilaian->jadwalAsesmen()->whereIn('status', ['terjadwal', 'berlangsung'])->update(['status' => 'selesai']);
 
         $pendaftaran = $penilaian->pendaftaran()->lockForUpdate()->first();
+        if ($pendaftaran) {
+            // Masuk antrean penerbitan sertifikat (CMS super admin). Dibuat sebelum riwayat status
+            // agar notifikasi admin dapat menautkan halaman penerbitannya.
+            app(PenerbitanSertifikasiService::class)->buatUntuk($penilaian);
+        }
         if (! $pendaftaran || $pendaftaran->status !== 'dijadwalkan') {
             return;
         }

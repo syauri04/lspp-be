@@ -5,6 +5,7 @@ namespace App\Http\Controllers\CMS;
 use App\Http\Controllers\Controller;
 use App\Models\JadwalAsesmen;
 use App\Models\PenilaianMuk;
+use App\Models\RiwayatDokumenPenilaian;
 use Illuminate\Http\Request;
 
 class AsesmenController extends Controller
@@ -41,6 +42,17 @@ class AsesmenController extends Controller
             'penilaianMuk.dokumenPenilaian.jenisDokumen',
         ]);
 
-        return view('cms.asesmen.show', compact('jadwalAsesmen'));
+        // Riwayat koreksi dokumen MUK oleh super admin (alasan + field sebelum/sesudah), terbaru dulu.
+        $riwayatKoreksi = $jadwalAsesmen->penilaianMuk
+            ? RiwayatDokumenPenilaian::query()
+                ->with(['dokumenPenilaian.jenisDokumen', 'pelaku'])
+                ->whereIn('dokumen_penilaian_id', $jadwalAsesmen->penilaianMuk->dokumenPenilaian->modelKeys())
+                ->where('aksi', 'dikoreksi_admin')
+                ->latest('id')
+                ->limit(100)
+                ->get()
+            : collect();
+
+        return view('cms.asesmen.show', compact('jadwalAsesmen', 'riwayatKoreksi'));
     }
 }

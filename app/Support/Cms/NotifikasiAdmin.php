@@ -29,6 +29,7 @@ class NotifikasiAdmin
         'penjadwalan' => ['mdi-calendar-clock', 'info'],
         'apl01' => ['mdi-clipboard-text-search-outline', 'danger'],
         'asesmen' => ['mdi-check-decagram-outline', 'success'],
+        'sertifikat' => ['mdi-certificate-outline', 'warning'],
         'lain' => ['mdi-bell-outline', 'secondary'],
     ];
 

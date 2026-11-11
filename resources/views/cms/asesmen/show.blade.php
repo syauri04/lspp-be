@@ -146,7 +146,17 @@
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <h5 class="card-title mb-0">Progres Asesmen (MUK)</h5>
                                         @php $sp = $statusPenilaian[$penilaian->status] ?? ['bg-secondary', $penilaian->status]; @endphp
-                                        <span class="badge {{ $sp[0] }}">{{ $sp[1] }}</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge {{ $sp[0] }}">{{ $sp[1] }}</span>
+                                            @can('kelola-sertifikasi')
+                                                <form method="POST" action="{{ route('muk.buka', $penilaian) }}" target="_blank" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Lihat, cetak & koreksi dokumen MUK">
+                                                        <i class="mdi mdi-printer me-1"></i> Buka di MUK
+                                                    </button>
+                                                </form>
+                                            @endcan
+                                        </div>
                                     </div>
                                     @php
                                         $dokumen = $penilaian->dokumenPenilaian;
@@ -191,6 +201,58 @@
                                             </tbody>
                                         </table>
                                     </div>
+
+                                    @if ($riwayatKoreksi->isNotEmpty())
+                                        <h6 class="mt-4 mb-2">Riwayat Koreksi Dokumen</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width:140px;">Waktu</th>
+                                                        <th style="width:110px;">Dokumen</th>
+                                                        <th>Alasan &amp; Perubahan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($riwayatKoreksi as $r)
+                                                        @php
+                                                            $ubah = $r->meta['perubahan'] ?? [];
+                                                            $jumlah = $r->meta['jumlah_perubahan'] ?? count($ubah);
+                                                            $nilai = fn ($v) => $v === null || $v === '' ? '(kosong)' : (is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE));
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="small">
+                                                                {{ $r->created_at->format('d M Y, H:i') }}
+                                                                <div class="text-muted">{{ $r->pelaku->name ?? '-' }}</div>
+                                                            </td>
+                                                            <td><code>{{ $r->dokumenPenilaian->jenisDokumen->kode }}</code></td>
+                                                            <td class="small">
+                                                                <div>{{ $r->catatan }}</div>
+                                                                @if (isset($r->meta['hasil']))
+                                                                    <div class="text-danger fw-semibold">Hasil asesmen ikut diubah: {{ $statusPenilaian[$r->meta['hasil']][1] ?? $r->meta['hasil'] }}</div>
+                                                                @endif
+                                                                <details class="mt-1">
+                                                                    <summary class="text-primary" style="cursor:pointer;">{{ $jumlah }} isian berubah</summary>
+                                                                    <ul class="mb-0 mt-1 ps-3">
+                                                                        @foreach ($ubah as $u)
+                                                                            <li>
+                                                                                <code>{{ $u['field'] }}</code>:
+                                                                                <span class="text-muted text-decoration-line-through">{{ $nilai($u['sebelum']) }}</span>
+                                                                                &rarr; {{ $nilai($u['sesudah']) }}
+                                                                            </li>
+                                                                        @endforeach
+                                                                        @if ($jumlah > count($ubah))
+                                                                            <li class="text-muted">dan {{ $jumlah - count($ubah) }} lainnya</li>
+                                                                        @endif
+                                                                    </ul>
+                                                                </details>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         @endif

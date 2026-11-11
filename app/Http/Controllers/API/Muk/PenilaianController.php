@@ -11,6 +11,7 @@ use App\Models\Asesi;
 use App\Models\Asesor;
 use App\Models\JadwalAsesmen;
 use App\Models\PenilaianMuk;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -68,9 +69,10 @@ class PenilaianController extends Controller
     }
 
     /** @return array<int, int> */
-    private function idPerluTindakan(Asesi|Asesor $user, string $peran, array $ids): array
+    private function idPerluTindakan(Asesi|Asesor|User $user, string $peran, array $ids): array
     {
-        if ($ids === []) {
+        // Admin (baca & cetak) tidak punya tindakan di MUK.
+        if ($ids === [] || $peran === 'admin') {
             return [];
         }
 

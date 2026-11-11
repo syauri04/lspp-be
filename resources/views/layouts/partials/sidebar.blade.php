@@ -75,6 +75,16 @@
                 </li>
 
                 <li>
+                    <a href="{{ route('penerbitan-sertifikat.index') }}" class="waves-effect">
+                        <i class="dripicons-trophy"></i>
+                        @if ($hitungMenu['penerbitan_sertifikat'] ?? 0)
+                            <span class="badge rounded-pill bg-success float-end" title="Sertifikat perlu diproses">{{ $hitungMenu['penerbitan_sertifikat'] > 99 ? '99+' : $hitungMenu['penerbitan_sertifikat'] }}</span>
+                        @endif
+                        <span>Penerbitan Sertifikat</span>
+                    </a>
+                </li>
+
+                <li>
                     <a href="{{ route('vouchers.index') }}" class="waves-effect">
                         <i class="dripicons-ticket"></i>
                         <span>Voucher</span>
