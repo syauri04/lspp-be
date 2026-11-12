@@ -261,6 +261,8 @@ class CheckoutController extends Controller
                 'invoice_number' => $pembayaran->kode_transaksi,
                 'callback_url' => rtrim(config('app.frontend_url'), '/').'/checkout/'.$pendaftaran->kode_pendaftaran.'/selesai',
                 'auto_redirect' => true,
+                // Rincian di invoice/halaman DOKU: skema (harga asli) + potongan voucher.
+                'line_items' => self::lineItems($pendaftaran, $pembayaran),
             ],
             'payment' => [
                 'payment_due_date' => $pembayaran->expired_at
@@ -327,6 +329,32 @@ class CheckoutController extends Controller
         return response()->json([
             'payment_url' => data_get($result, 'response.payment.url'),
         ]);
+    }
+
+    /**
+     * Rincian tagihan untuk DOKU: 1 x skema dengan harga asli, lalu baris potongan voucher (harga minus).
+     * DOKU menolak sesi bila jumlah price x quantity != order.amount ("AMOUNT NOT MATCH"), jadi bila data
+     * lama tidak konsisten (harga awal - potongan != tagihan) cukup satu baris seharga tagihan.
+     *
+     * @return array<int, array{name: string, price: int, quantity: int}>
+     */
+    public static function lineItems(PendaftaranSertifikasi $pendaftaran, Pembayaran $pembayaran): array
+    {
+        $nama = mb_substr('Sertifikasi '.($pendaftaran->skemaSertifikasi?->title['id'] ?? 'Kompetensi'), 0, 255);
+        $tagihan = (int) round((float) $pembayaran->jumlah);
+        $hargaAwal = $pembayaran->hargaAwal();
+        $potongan = (int) round((float) ($pembayaran->potongan ?? 0));
+
+        if ($potongan <= 0 || $hargaAwal - $potongan !== $tagihan) {
+            return [['name' => $nama, 'price' => $tagihan, 'quantity' => 1]];
+        }
+
+        $voucher = $pembayaran->voucher_kode ? " {$pembayaran->voucher_kode}" : '';
+
+        return [
+            ['name' => $nama, 'price' => $hargaAwal, 'quantity' => 1],
+            ['name' => mb_substr("Potongan voucher{$voucher}", 0, 255), 'price' => -$potongan, 'quantity' => 1],
+        ];
     }
 
     private function asesiAtauTolak(Request $request, PendaftaranSertifikasi $pendaftaran): Asesi

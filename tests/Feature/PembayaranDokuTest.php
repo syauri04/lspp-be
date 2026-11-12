@@ -71,6 +71,36 @@ describe('POST /api/checkout/{kode}/pay', function () {
         Http::assertSentCount(1); // dipakai ulang, tidak membuat sesi DOKU baru
     });
 
+    it('mengirim rincian line_items: skema harga asli + potongan voucher, totalnya sama dengan amount', function () {
+        $p = tagihanMenunggu();
+        $skema = 'Sertifikasi '.$p->skemaSertifikasi->title['id'];
+        Http::fake(['api-sandbox.doku.com/*' => Http::response(['response' => ['payment' => ['url' => 'https://sandbox.doku.com/bayar/x', 'token_id' => 't']]])]);
+        $bayar = function () use ($p) {
+            $p->pembayaran->fresh()->update(['gateway_payload' => null]);
+            $this->withToken($p->asesi->createToken('auth_token')->plainTextToken)->postJson("/api/checkout/{$p->kode_pendaftaran}/pay")->assertOk();
+            app('auth')->forgetGuards();
+        };
+        $terkirim = fn () => json_decode(Http::recorded()->last()[0]->body(), true)['order'];
+
+        // Tanpa voucher: satu baris skema seharga tagihan.
+        $bayar();
+        expect($terkirim()['line_items'])->toBe([['name' => $skema, 'price' => 500000, 'quantity' => 1]]);
+
+        // Dengan voucher: harga asli + baris potongan (minus); jumlah = order.amount.
+        $p->pembayaran->update(['jumlah_awal' => 500000, 'potongan' => 150000, 'jumlah' => 350000, 'voucher_kode' => 'HEMAT30']);
+        $bayar();
+        $o = $terkirim();
+        expect($o['line_items'])->toBe([
+            ['name' => $skema, 'price' => 500000, 'quantity' => 1],
+            ['name' => 'Potongan voucher HEMAT30', 'price' => -150000, 'quantity' => 1],
+        ])->and(collect($o['line_items'])->sum(fn ($i) => $i['price'] * $i['quantity']))->toBe($o['amount']);
+
+        // Data lama tidak konsisten: satu baris seharga tagihan (DOKU menolak bila total tidak sama).
+        $p->pembayaran->update(['potongan' => 100000]);
+        $bayar();
+        expect($terkirim()['line_items'])->toBe([['name' => $skema, 'price' => 350000, 'quantity' => 1]]);
+    });
+
     it('DOKU tidak dapat dihubungi -> 503 dengan pesan jelas', function () {
         $p = tagihanMenunggu();
         Http::fake(fn () => throw new ConnectionException('cURL error 28: Timeout was reached'));
