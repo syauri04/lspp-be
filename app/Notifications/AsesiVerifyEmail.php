@@ -4,10 +4,11 @@ namespace App\Notifications;
 
 use Illuminate\Auth\Notifications\VerifyEmail as BaseVerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
-class AsesiVerifyEmail extends BaseVerifyEmail
+class AsesiVerifyEmail extends BaseVerifyEmail implements ShouldQueue
 {
 
     protected function verificationUrl($notifiable)
