@@ -131,7 +131,7 @@
                                         </div>
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="waktu_mulai" class="form-label">Waktu Mulai</label>
+                                                <label for="waktu_mulai" class="form-label">Waktu</label>
                                                 <input type="time" name="waktu_mulai" class="form-control"
                                                     id="waktu_mulai" value="{{ old('waktu_mulai') }}" required>
 
@@ -140,21 +140,20 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        {{-- <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label for="waktu_selesai" class="form-label">Waktu Selesai</label>
                                                 <input type="time" name="waktu_selesai" class="form-control"
                                                     id="waktu_selesai" value="{{ old('waktu_selesai') }}">
                                             </div>
-                                        </div>
+                                        </div> --}}
                                     </div>
 
                                     <div class="row">
                                         <div class="col-md-12">
                                             <div class="mb-3">
                                                 <label for="catatan" class="form-label">Catatan (opsional)</label>
-                                                <textarea name="catatan" class="form-control" id="catatan" rows="3"
-                                                    placeholder="Catatan untuk asesor / asesi">{{ old('catatan') }}</textarea>
+                                                <textarea name="catatan" class="form-control" id="catatan" rows="3" placeholder="Catatan untuk asesor / asesi">{{ old('catatan') }}</textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -164,8 +163,7 @@
                                             onclick="return confirm('Simpan jadwal asesmen ini?')">
                                             Simpan Jadwal
                                         </button>
-                                        <a href="{{ route('penjadwalan-asesmen.index') }}"
-                                            class="btn btn-light">Batal</a>
+                                        <a href="{{ route('penjadwalan-asesmen.index') }}" class="btn btn-light">Batal</a>
                                     </div>
                                 </form>
                             </div>
