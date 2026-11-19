@@ -109,7 +109,7 @@ describe('FR.IA.06A', function () {
     });
 
     it('tidak bisa dibuka bila soal belum diisi di CMS', function () {
-        [$p, $token, , $template] = ia06Siap();
+        [$p, $token,, $template] = ia06Siap();
         $template->update(['instrumen' => null]);
 
         $this->withToken($token)->postJson("/api/muk/penilaian/{$p->id}/dokumen/ia-06a/buka")->assertJsonValidationErrors('persiapan.soal');
@@ -160,13 +160,21 @@ describe('FR.IA.06C', function () {
             ->assertJsonPath('data.header.tuk', 'mandiri')
             ->assertJsonPath('data.isian.pencapaian', [null, null]);
         expect($res->getContent())->not->toContain('KUNCI-RAHASIA')
-            ->and($res->json('data.isian.umpan_balik'))->toContain('Aspek pengetahuan');
+            ->and($res->json('data.isian.aspek_pengetahuan'))->toBeNull()
+            ->and($res->json('data.isian.unit_belum_tercapai'))->toBeNull();
 
-        $this->withToken($token)->patchJson($url, ['isian' => ['pencapaian' => ['ya'], 'umpan_balik' => '']])->assertOk();
+
+        $this->withToken($token)->patchJson($url, ['isian' => ['pencapaian' => ['ya'], 'aspek_pengetahuan' => null]])->assertOk();
+
         $this->withToken($token)->postJson("{$url}/tanda-tangan", ['tanda_tangan' => pngDataUrl()])->assertOk();
-        $this->withToken($token)->postJson("{$url}/submit")->assertJsonValidationErrors(['isian.pencapaian.1', 'isian.umpan_balik']);
+        $this->withToken($token)->postJson("{$url}/submit")
+            ->assertJsonValidationErrors(['isian.pencapaian.1', 'isian.aspek_pengetahuan']);
 
-        $this->withToken($token)->patchJson($url, ['isian' => ['pencapaian' => ['ya', 'tidak'], 'umpan_balik' => 'Aspek pengetahuan tercapai sebagian.']])->assertOk();
+        $this->withToken($token)->patchJson($url, ['isian' => ['pencapaian' => ['ya', 'tidak'], 'aspek_pengetahuan' => 'belum_tercapai']])->assertOk();
+        $this->withToken($token)->postJson("{$url}/submit")
+            ->assertJsonValidationErrors(['isian.unit_belum_tercapai']);
+
+        $this->withToken($token)->patchJson($url, ['isian' => ['pencapaian' => ['ya', 'tidak'], 'aspek_pengetahuan' => 'belum_tercapai', 'unit_belum_tercapai' => 'Unit 1 / Elemen 2']])->assertOk();
         $this->withToken($token)->postJson("{$url}/tanda-tangan", ['tanda_tangan' => pngDataUrl()])->assertOk();
         $this->withToken($token)->postJson("{$url}/submit")->assertOk()->assertJsonPath('data.dokumen.status', DokumenPenilaian::STATUS_MENUNGGU_PERSETUJUAN);
         gantiAkun();
