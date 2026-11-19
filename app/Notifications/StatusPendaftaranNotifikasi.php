@@ -46,7 +46,7 @@ class StatusPendaftaranNotifikasi extends Notification implements ShouldQueue
         $isi = $this->isi();
         $mail = (new MailMessage)
             ->subject($isi['subjek'])
-            ->greeting('Halo, '.($notifiable->name ?? '').'!');
+            ->greeting('Halo, ' . ($notifiable->name ?? '') . '!');
         foreach ($isi['baris'] as $baris) {
             $mail->line($baris);
         }
@@ -116,8 +116,8 @@ class StatusPendaftaranNotifikasi extends Notification implements ShouldQueue
         return [
             'judul' => 'Hasil asesmen',
             'subjek' => "Hasil Asesmen Sertifikasi: {$hasil}",
-            'pesan' => "Asesmen {$skema} telah selesai. Anda dinyatakan {$hasil}. {$lanjut}",
-            'baris' => ["Asesmen {$skema} telah selesai.", "Hasil: Anda dinyatakan {$hasil}.", $lanjut],
+            'pesan' => "Asesmen {$skema} telah selesai. Anda direkomendasikan {$hasil}. {$lanjut}",
+            'baris' => ["Asesmen {$skema} telah selesai.", "Hasil: Anda direkomendasikan {$hasil}.", $lanjut],
             'tombol' => 'Lihat Hasil',
             'url' => $profil,
         ];
@@ -146,6 +146,6 @@ class StatusPendaftaranNotifikasi extends Notification implements ShouldQueue
     /** Path website (tanpa bahasa) -> URL lspp-fe absolut untuk tombol email. */
     private function urlAbsolut(string $path): string
     {
-        return rtrim(config('app.frontend_url'), '/').'/id'.$path;
+        return rtrim(config('app.frontend_url'), '/') . '/id' . $path;
     }
 }
