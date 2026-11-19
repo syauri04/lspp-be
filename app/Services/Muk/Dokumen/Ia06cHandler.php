@@ -13,11 +13,15 @@ use Illuminate\Validation\Rule;
  * asesi + umpan balik, menandatangani, lalu asesi menyetujui dengan tanda tangan (pola AK).
  * Kunci jawaban TIDAK ditampilkan di sini (dokumen ini juga dibaca asesi).
  *
- * Isian: { pencapaian: [ya|tidak|null], umpan_balik }
+ * Isian: {
+ *   pencapaian: [ya|tidak|null],
+ *   aspek_pengetahuan: tercapai|belum_tercapai|null  (seluruh unit kompetensi yang diujikan),
+ *   unit_belum_tercapai: teks Unit/Elemen/KUK (hanya bila aspek = belum_tercapai)
+ * }
  */
 class Ia06cHandler extends PersetujuanHandler implements PunyaPrasyarat
 {
-    public const UMPAN_BALIK_AWAL = "Aspek pengetahuan seluruh unit kompetensi yang diujikan (tercapai/ belum tercapai)*\n\nTuliskan Unit/Elemen/KUK jika belum tercapai: ....";
+    public const ASPEK = ['tercapai', 'belum_tercapai'];
 
     public function kode(): string
     {
@@ -26,7 +30,7 @@ class Ia06cHandler extends PersetujuanHandler implements PunyaPrasyarat
 
     public function alasanPrasyarat(DokumenPenilaian $dokumen, Collection $semuaDokumen, string $peran): ?string
     {
-        $ia06a = $semuaDokumen->first(fn (DokumenPenilaian $d) => $d->jenisDokumen->kode === JenisDokumenMuk::IA_06A);
+        $ia06a = $semuaDokumen->first(fn(DokumenPenilaian $d) => $d->jenisDokumen->kode === JenisDokumenMuk::IA_06A);
 
         return $ia06a?->status === DokumenPenilaian::STATUS_SELESAI ? null : 'Menunggu asesi mengirim jawaban FR.IA.06A.';
     }
@@ -45,10 +49,11 @@ class Ia06cHandler extends PersetujuanHandler implements PunyaPrasyarat
     public function rulesSimpan(DokumenPenilaian $dokumen): array
     {
         return [
-            'isian' => ['required', 'array:pencapaian,umpan_balik'],
-            'isian.pencapaian' => ['sometimes', 'array', 'max:'.Ia06aHandler::MAKS_SOAL],
+            'isian' => ['required', 'array:pencapaian,aspek_pengetahuan,unit_belum_tercapai'],
+            'isian.pencapaian' => ['sometimes', 'array', 'max:' . Ia06aHandler::MAKS_SOAL],
             'isian.pencapaian.*' => ['nullable', Rule::in(['ya', 'tidak'])],
-            'isian.umpan_balik' => ['nullable', 'string', 'max:5000'],
+            'isian.aspek_pengetahuan' => ['nullable', Rule::in(self::ASPEK)],
+            'isian.unit_belum_tercapai' => ['nullable', 'string', 'max:5000'],
         ];
     }
 
@@ -61,8 +66,10 @@ class Ia06cHandler extends PersetujuanHandler implements PunyaPrasyarat
                 $errors["isian.pencapaian.{$i}"] = 'Pilih pencapaian Ya atau Tidak.';
             }
         }
-        if ($d['umpan_balik'] === null) {
-            $errors['isian.umpan_balik'] = 'Tuliskan umpan balik untuk asesi.';
+        if ($d['aspek_pengetahuan'] === null) {
+            $errors['isian.aspek_pengetahuan'] = 'Pilih tercapai atau belum tercapai.';
+        } elseif ($d['aspek_pengetahuan'] === 'belum_tercapai' && $d['unit_belum_tercapai'] === null) {
+            $errors['isian.unit_belum_tercapai'] = 'Tuliskan Unit/Elemen/KUK yang belum tercapai.';
         }
 
         return $errors;
@@ -75,7 +82,7 @@ class Ia06cHandler extends PersetujuanHandler implements PunyaPrasyarat
 
     protected function prefill(DokumenPenilaian $dokumen): array
     {
-        return $this->normalisasi($dokumen, ['umpan_balik' => self::UMPAN_BALIK_AWAL]);
+        return $this->normalisasi($dokumen, []);
     }
 
     protected function normalisasi(DokumenPenilaian $dokumen, ?array $data): array
@@ -87,7 +94,14 @@ class Ia06cHandler extends PersetujuanHandler implements PunyaPrasyarat
             $pencapaian[] = in_array($nilai, ['ya', 'tidak'], true) ? $nilai : null;
         }
 
-        return ['pencapaian' => $pencapaian, 'umpan_balik' => self::teks($data['umpan_balik'] ?? null, 5000)];
+        $aspek = in_array($data['aspek_pengetahuan'] ?? null, self::ASPEK, true) ? $data['aspek_pengetahuan'] : null;
+
+        return [
+            'pencapaian' => $pencapaian,
+            'aspek_pengetahuan' => $aspek,
+            // Unit/Elemen/KUK hanya bermakna bila belum tercapai.
+            'unit_belum_tercapai' => $aspek === 'belum_tercapai' ? self::teks($data['unit_belum_tercapai'] ?? null, 5000) : null,
+        ];
     }
 
     /** Header & jawaban asesi dari FR.IA.06A (snapshot IA.06A bila ada). Tanpa kunci jawaban. */
@@ -100,7 +114,7 @@ class Ia06cHandler extends PersetujuanHandler implements PunyaPrasyarat
 
         return [
             'header' => ['tuk' => $p['tuk'], 'tanggal' => $p['tanggal'], 'waktu' => $p['waktu']],
-            'jawaban_asesi' => array_map(fn ($teks, $i) => [
+            'jawaban_asesi' => array_map(fn($teks, $i) => [
                 'pertanyaan' => $teks,
                 'jawaban' => self::teks($jawaban[$i] ?? null, 10000),
             ], $pertanyaan, array_keys($pertanyaan)),

@@ -3,6 +3,7 @@
 use App\Services\Muk\Dokumen\Ak01Handler;
 use App\Services\Muk\Dokumen\Ak02Handler;
 use App\Services\Muk\Dokumen\Ak03Handler;
+use App\Services\Muk\Dokumen\Ak04Handler;
 use App\Services\Muk\Dokumen\Ak05Handler;
 use App\Services\Muk\Dokumen\Ak06Handler;
 use App\Services\Muk\Dokumen\Ak07Handler;
@@ -57,6 +58,7 @@ return [
         'apl-02' => Apl02Handler::class,
         'mapa-01' => Mapa01Handler::class,
         'mapa-02' => Mapa02Handler::class,
+        'ak-04' => Ak04Handler::class,
         'ak-07' => Ak07Handler::class,
         'ak-01' => Ak01Handler::class,
         'ia-01' => Ia01Handler::class,
