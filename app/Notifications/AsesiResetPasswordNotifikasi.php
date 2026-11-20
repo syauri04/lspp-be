@@ -32,7 +32,7 @@ class AsesiResetPasswordNotifikasi extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $url = rtrim(config('app.frontend_url'), '/')."/{$this->lang}/reset-password?".http_build_query([
+        $url = rtrim(config('app.frontend_url'), '/') . "/{$this->lang}/reset-password?" . http_build_query([
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
         ]);
@@ -46,7 +46,7 @@ class AsesiResetPasswordNotifikasi extends Notification implements ShouldQueue
                 ->action('Reset Password', $url)
                 ->line("This link is valid for {$menit} minutes and can only be used once.")
                 ->line('If you did not request a password reset, ignore this email. Your password will not change.')
-                ->salutation('Regards, lspp306.com');
+                ->salutation('Regards, LSPP306');
         }
 
         return (new MailMessage)
@@ -56,6 +56,6 @@ class AsesiResetPasswordNotifikasi extends Notification implements ShouldQueue
             ->action('Atur Ulang Password', $url)
             ->line("Link ini berlaku {$menit} menit dan hanya bisa dipakai sekali.")
             ->line('Jika Anda tidak meminta reset password, abaikan email ini. Password Anda tidak akan berubah.')
-            ->salutation('Salam, lspp306.com');
+            ->salutation('Salam, LSPP306');
     }
 }

@@ -43,6 +43,6 @@ class AsesiVerifyEmail extends BaseVerifyEmail
             ->action('Verifikasi Email', $url)
             ->line('Link ini berlaku selama 60 menit.')
             ->line('Jika Anda tidak merasa mendaftar, abaikan email ini.')
-            ->salutation('Salam, lspp306.com');
+            ->salutation('Salam, LSPP306');
     }
 }
