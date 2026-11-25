@@ -126,6 +126,12 @@
                         <span>Tentang Kami</span>
                     </a>
                 </li>
+                <li>
+                    <a href="{{ route('kontak-website.edit') }}" class="waves-effect">
+                        <i class="dripicons-phone"></i>
+                        <span>Kontak Kami</span>
+                    </a>
+                </li>
 
                 <li>
                     <a href="javascript: void(0);"

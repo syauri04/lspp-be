@@ -17,6 +17,7 @@ use App\Http\Controllers\API\CalendarsController;
 use App\Http\Controllers\API\FaqController;
 use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\HeroBannerController;
+use App\Http\Controllers\API\KontakWebsiteController;
 use App\Http\Controllers\API\MitraController;
 use App\Http\Controllers\API\Muk\Apl01BuktiController as MukApl01BuktiController;
 use App\Http\Controllers\API\Muk\Apl01RelevanController as MukApl01RelevanController;
@@ -185,6 +186,15 @@ Route::prefix('muk')->group(function () {
             Route::post('tarik', [MukDokumenController::class, 'tarik'])->middleware('throttle:muk-aksi');
         });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Kontak website (publik, tanpa token)
+|--------------------------------------------------------------------------
+| Footer & tombol WhatsApp website. Informasi publik -> tidak memakai token statis website,
+| sehingga tetap tampil walau token bermasalah. Baca saja + rate limit per IP.
+*/
+Route::get('/kontak', [KontakWebsiteController::class, 'show'])->middleware('throttle:60,1');
 
 /*
 |--------------------------------------------------------------------------

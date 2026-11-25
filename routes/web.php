@@ -12,6 +12,7 @@ use App\Http\Controllers\CMS\ElemenKompetensiController;
 use App\Http\Controllers\CMS\FaqController;
 use App\Http\Controllers\CMS\GalleryAlbumController;
 use App\Http\Controllers\CMS\HeroBannerController;
+use App\Http\Controllers\CMS\KontakWebsiteController;
 use App\Http\Controllers\CMS\MapaTemplateController;
 use App\Http\Controllers\CMS\MemberController;
 use App\Http\Controllers\CMS\MitraController;
@@ -158,6 +159,10 @@ Route::middleware(['auth'])->group(function () {
         '/about-page',
         [AboutPageController::class, 'update']
     )->name('about-page.update');
+
+    // Kontak website (footer "Kontak Kami" & tombol WhatsApp mengambang)
+    Route::get('/kontak-website', [KontakWebsiteController::class, 'edit'])->name('kontak-website.edit');
+    Route::put('/kontak-website', [KontakWebsiteController::class, 'update'])->name('kontak-website.update');
 
     // Sturktur Organisasi
     Route::resource('organizational/divisions', DivisionController::class);
